@@ -16,31 +16,69 @@ BOLD='\033[1m'
 
 echo -e "${BLUE}⚡ Installing agent-history plugin...${NC}"
 
-# Define custom plugin directory
-ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
-PLUGIN_DIR="$ZSH_CUSTOM/plugins/agent-history"
 REPO_URL="https://github.com/aaronbronow/agent-history.git"
 
+# Detect shell and framework
+SHELL_NAME=$(basename "${SHELL:-bash}")
+OMZ_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+if [[ "$SHELL_NAME" == "zsh" ]] && [ -d "$HOME/.oh-my-zsh" ]; then
+    echo -e "${CYAN}Oh My Zsh environment detected.${NC}"
+    PLUGIN_DIR="$OMZ_DIR/plugins/agent-history"
+    IS_OMZ=true
+else
+    echo -e "${CYAN}Generic shell environment detected (Shell: $SHELL_NAME).${NC}"
+    PLUGIN_DIR="$HOME/.agent-history"
+    IS_OMZ=false
+fi
+
+# Clone or update the repository
 if [ -d "$PLUGIN_DIR" ]; then
     echo -e "${YELLOW}Plugin directory already exists. Updating plugin via git pull...${NC}"
     git -C "$PLUGIN_DIR" pull
 else
-    echo -e "${CYAN}Cloning agent-history repository...${NC}"
+    echo -e "${CYAN}Cloning agent-history repository to $PLUGIN_DIR...${NC}"
     git clone "$REPO_URL" "$PLUGIN_DIR"
 fi
 
-# Check ~/.zshrc for plugin activation
-ZSHRC="$HOME/.zshrc"
-if [ -f "$ZSHRC" ]; then
-    if grep -q "agent-history" "$ZSHRC"; then
-        echo -e "${GREEN}✓ agent-history is already enabled in your .zshrc!${NC}"
+if [ "$IS_OMZ" = true ]; then
+    # Check ~/.zshrc for Oh My Zsh plugin activation
+    ZSHRC="$HOME/.zshrc"
+    if [ -f "$ZSHRC" ]; then
+        if grep -q "agent-history" "$ZSHRC"; then
+            echo -e "${GREEN}✓ agent-history is already enabled in your .zshrc!${NC}"
+        else
+            echo -e "${YELLOW}! agent-history is not enabled in your .zshrc plugins list.${NC}"
+            echo -e "To enable it, open ${BLUE}~/.zshrc${NC} and add ${CYAN}agent-history${NC} to your plugins list, e.g.:"
+            echo -e "  plugins=(\n    ...\n    ${CYAN}agent-history${NC}\n  )"
+        fi
     else
-        echo -e "${YELLOW}! agent-history is not enabled in your .zshrc plugins list.${NC}"
-        echo -e "To enable it, open ${BLUE}~/.zshrc${NC} and add ${CYAN}agent-history${NC} to your plugins list, e.g.:"
-        echo -e "  plugins=(\n    ...\n    ${CYAN}agent-history${NC}\n  )"
+        echo -e "${RED}Warning: ~/.zshrc file not found. Make sure to load the plugin in your shell configuration.${NC}"
     fi
 else
-    echo -e "${RED}Warning: ~/.zshrc file not found. Make sure to load the plugin in your shell configuration.${NC}"
+    # Determine configuration file to update for non-OMZ installations
+    if [[ "$SHELL_NAME" == "zsh" ]] || [ -f "$HOME/.zshrc" ]; then
+        RC_FILE="$HOME/.zshrc"
+        LOADER_FILE="agent-history.plugin.zsh"
+    else
+        RC_FILE="$HOME/.bashrc"
+        LOADER_FILE="agent-history.plugin.sh"
+    fi
+
+    if [ -f "$RC_FILE" ]; then
+        if grep -q "$LOADER_FILE" "$RC_FILE"; then
+            echo -e "${GREEN}✓ agent-history loader is already configured in $RC_FILE!${NC}"
+        else
+            echo -e "${YELLOW}Adding loader to $RC_FILE...${NC}"
+            echo -e "\n# agent-history plugin loader" >> "$RC_FILE"
+            echo "source \"$PLUGIN_DIR/$LOADER_FILE\"" >> "$RC_FILE"
+            echo -e "${GREEN}✓ Added loader to $RC_FILE!${NC}"
+        fi
+    else
+        echo -e "${RED}Warning: Shell configuration file $RC_FILE not found.${NC}"
+        echo -e "To complete installation, add the following to your shell startup file:"
+        echo -e "  ${CYAN}source \"$PLUGIN_DIR/$LOADER_FILE\"${NC}"
+    fi
 fi
 
-echo -e "\n${GREEN}✓ Installation complete! Run ${BOLD}${PURPLE}source ~/.zshrc${NC}${GREEN} to reload your shell.${NC}\n"
+echo -e "\n${GREEN}✓ Installation complete! Run ${BOLD}${PURPLE}source $RC_FILE${NC}${GREEN} to reload your shell.${NC}\n"

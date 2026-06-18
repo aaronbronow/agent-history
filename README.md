@@ -14,6 +14,12 @@ It reads the command execution logs and session databases, filters out deleted f
 
 ## Installation & Shell Support
 
+### 1-Line Quick Install (Recommended)
+You can install or update the plugin automatically using our installer script via `curl`:
+```bash
+curl -sSL https://raw.githubusercontent.com/aaronbronow/agent-history/main/install.sh | bash
+```
+
 ### Zsh Frameworks (Oh My Zsh, Antidote, Zinit, Zim)
 * **Oh My Zsh**: Clone this repository into your custom plugins folder:
   ```bash
