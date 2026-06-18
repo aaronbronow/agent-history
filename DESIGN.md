@@ -29,13 +29,13 @@ This results in instantaneous load times (less than 5ms total execution time), k
 ### Parent Shell Navigation Trick
 A child process (the python script) cannot change the current working directory (`cd`) of its parent shell. 
 To resolve this:
-1. The zsh function `ag-recent` is the primary interface.
-2. If arguments are passed (e.g., `ag-recent 2`), it queries the python script using a hidden argument: `antigravity-recent.py --path 2`.
-3. The python script outputs only the raw directory path.
-4. The zsh wrapper captures this output and calls `cd` in the parent process.
+1. The Zsh function `agent-history` (aliased as `ah`) is the primary interface.
+2. If arguments are passed (e.g., `ah 2`), it queries the Bash script using a hidden argument: `agent-history --path 2`.
+3. The Bash script outputs only the raw directory path.
+4. The Zsh wrapper captures this output and calls `cd` in the parent process.
 
 ## 3. Testability
-To allow robust unit tests, the python script accepts two override environment variables:
+To allow robust unit tests, the Bash script accepts two override environment variables:
 - `ANTIGRAVITY_HISTORY_FILE`: Allows pointing to custom mock JSONL fixtures.
 - `ANTIGRAVITY_MOCK_TIME`: Locks the "current" system time for deterministic relative time formatting assertions.
-This allows running fast python unit tests without interfering with the live history files.
+This allows running fast Bash unit tests without interfering with the live history files.

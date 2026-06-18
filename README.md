@@ -10,7 +10,7 @@ It reads the Antigravity command execution logs (`history.jsonl`), filters out d
 - **Git Branch Integration**: Shows the current active Git branch (works with standard git repositories and git worktrees).
 - **Directory Validation**: Automatically filters out projects that have been renamed or deleted.
 - **SSH Auto-run Dashboard**: Automatically prints the dashboard on login when establishing an SSH session.
-- **Quick Shell Navigation (`ag-recent <num>`)**: Jump directly to a project directory.
+- **Quick Shell Navigation (`ah <num>`)**: Jump directly to a project directory.
 
 ## Installation
 
@@ -44,7 +44,7 @@ source ~/.zshrc
 ## Usage
 
 ### Display Recent Projects
-Simply type `ag-recent` (or use the convenient shortcut alias `ah`):
+Simply type `agent-history` (or use the convenient shortcut alias `ah`):
 ```bash
 ah
 ```
@@ -57,13 +57,13 @@ Output:
   4. ~/dev/scratch/gsig_app                   (bookstore-app) (2d ago)
   5. ~/dev/packablock                         (main) (4d ago)
 
-💡 Run ag-recent <num> to jump to a project folder.
+💡 Run ah <num> to jump to a project folder.
 ```
 
 ### Quick Jump
 To switch your shell's current working directory directly to one of the listed projects, pass the project index:
 ```bash
-ag-recent 2
+ah 2
 ```
 
 ## Configuration

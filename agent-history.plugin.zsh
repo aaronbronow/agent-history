@@ -1,7 +1,7 @@
 # Oh My Zsh Plugin: agent-history
 # Exposes utilities to track and switch to recent Antigravity workspaces.
 
-function ag-recent() {
+function agent-history() {
     # Resolve the plugin's absolute directory to locate the bash script
     local plugin_dir="${0:A:h}"
     local script_path="$plugin_dir/agent-history"
@@ -23,7 +23,7 @@ function ag-recent() {
             return 1
         fi
     else
-        echo "Usage: ag-recent [1-5]" >&2
+        echo "Usage: ah [1-5]" >&2
         return 1
     fi
 }
@@ -38,5 +38,5 @@ if [[ -n "$SSH_CONNECTION" ]]; then
 fi
 
 # Convenient shortcut alias
-alias ah="ag-recent"
+alias ah="agent-history"
 

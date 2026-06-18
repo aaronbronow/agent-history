@@ -499,7 +499,7 @@ main() {
         printf "  %d. ${CYAN}%-40s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$rel_time"
     done
 
-    echo -e "\n💡 ${GRAY}Run ${BOLD}ag-recent <num>${RESET}${GRAY} to jump to a project folder.${RESET}\n"
+    echo -e "\n💡 ${GRAY}Run ${BOLD}ah <num>${RESET}${GRAY} to jump to a project folder.${RESET}\n"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
