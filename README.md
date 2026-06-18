@@ -1,8 +1,8 @@
 # agent-history plugin
 
-An Oh My Zsh plugin to track and easily navigate to your most recent projects and workspaces where you have been chatting with the Antigravity coding assistant.
+A universal shell plugin (supporting Zsh, Bash, and Fish) to track and easily navigate to your most recent projects and workspaces where you have been chatting with AI coding assistants (such as Antigravity, Claude Code, Copilot, Aider, and Pi).
 
-It reads the Antigravity command execution logs (`history.jsonl`), filters out deleted folders and your root home directory, and displays a beautiful status dashboard of the top 5 projects sorted by recency.
+It reads the command execution logs and session databases, filters out deleted folders and your root home directory, and displays a beautiful status dashboard of the top 5 projects sorted by recency.
 
 ## Features
 
@@ -12,7 +12,7 @@ It reads the Antigravity command execution logs (`history.jsonl`), filters out d
 - **SSH Auto-run Dashboard**: Automatically prints the dashboard on login when establishing an SSH session.
 - **Quick Shell Navigation (`ah <num>`)**: Jump directly to a project directory.
 
-## Installation
+## Installation & Shell Support
 
 ### 1-Line Quick Install (Recommended)
 You can install or update the plugin automatically using our installer script via `curl` or `wget`:
@@ -20,26 +20,23 @@ You can install or update the plugin automatically using our installer script vi
 curl -sSL https://raw.githubusercontent.com/aaronbronow/agent-history/main/install.sh | bash
 ```
 
-### Manual Installation
-Clone this repository into your custom Oh My Zsh plugins folder:
-```bash
-git clone https://github.com/aaronbronow/agent-history.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/agent-history
-```
+### Zsh Frameworks (Oh My Zsh, Antidote, Zinit, Zim)
+* **Oh My Zsh**: Clone this repository into your custom plugins folder:
+  ```bash
+  git clone https://github.com/aaronbronow/agent-history.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/agent-history
+  ```
+  Then add `agent-history` to your `plugins=(...)` list in `~/.zshrc`.
+* **Antidote / Zinit**: Add `aaronbronow/agent-history` to your plugins file (`plugins.txt` for Antidote). It will automatically load via `agent-history.plugin.zsh`.
 
-### 2. Enable the Plugin
-Add `agent-history` to the `plugins` array in your `~/.zshrc` configuration file:
-```zsh
-plugins=(
-    # ... other plugins ...
-    agent-history
-)
-```
+### Bash Frameworks (Oh My Bash, Bash-it)
+* **Oh My Bash**: Clone the repository to `~/.oh-my-bash/custom/plugins/agent-history` and enable it in your `~/.bashrc`. It will load via `agent-history.plugin.sh`.
 
-### 3. Load the Changes
-Source your `~/.zshrc` file or open a new terminal session:
-```bash
-source ~/.zshrc
-```
+### Fish Shell (Fisher)
+* Install via Fisher:
+  ```fish
+  fisher install aaronbronow/agent-history
+  ```
+  It will load via `conf.d/agent-history.fish`.
 
 ## Usage
 
