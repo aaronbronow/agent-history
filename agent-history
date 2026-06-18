@@ -133,10 +133,10 @@ resolve_encoded_path() {
 }
 
 
-# Helper to find the most recent session/log file in a directory
-find_most_recent_session_file() {
+# Helper to find recent session/log files in a directory
+find_recent_session_files() {
     local dir="$1"
-    # Find files of interest, print mtime and path, sort descending, get the first one.
+    # Find files of interest, print mtime and path, sort descending, get the top 50.
     find -L "$dir" -type f \( \
         -name "*.jsonl" \
         -o -name ".project_root" \
@@ -150,7 +150,7 @@ find_most_recent_session_file() {
         -o -path "*/brain/*/logs/transcript.jsonl" \
         -o -path "*/brain/*/logs/transcript_full.jsonl" \
         -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
-    \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1
+    \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 50
 }
 
 # Helper to read workspace path from a session manifest or log file
@@ -398,19 +398,19 @@ main() {
             fi
         fi
         
-        # Find the most recent session or chat history file
-        local recent_res
-        recent_res=$(find_most_recent_session_file "$path" || true)
-        if [[ -z "$recent_res" ]]; then
-            continue
-        fi
-        
-        # Parse timestamp and file path
-        local timestamp="${recent_res%% *}"
-        local mtime="${timestamp%%.*}"
-        local file_path="${recent_res#* }"
-        
-        matched_entries+=("$mtime|$raw_path|$file_path")
+        # Find the recent session or chat history files
+        while read -r recent_res; do
+            if [[ -z "$recent_res" ]]; then
+                continue
+            fi
+            
+            # Parse timestamp and file path
+            local timestamp="${recent_res%% *}"
+            local mtime="${timestamp%%.*}"
+            local file_path="${recent_res#* }"
+            
+            matched_entries+=("$mtime|$raw_path|$file_path")
+        done < <(find_recent_session_files "$path" || true)
     done
 
     if (( ${#matched_entries[@]} == 0 )); then
@@ -432,6 +432,7 @@ main() {
     local valid_mtimes=()
     local valid_files=()
     local count=0
+    local -A seen_workspaces
 
     for line in "${sorted_lines[@]}"; do
         if (( count >= 5 )); then
@@ -449,6 +450,24 @@ main() {
         if [[ ! -d "$ws" ]]; then
             continue
         fi
+
+        # Exclude home directory
+        if [[ "$ws" == "$HOME" ]]; then
+            continue
+        fi
+
+        # Exclude hidden directories under home directory
+        local base_ws
+        base_ws=$(basename "$ws")
+        if [[ "$base_ws" == .* ]]; then
+            continue
+        fi
+
+        # Deduplicate workspaces
+        if [[ -n "${seen_workspaces[$ws]:-}" ]]; then
+            continue
+        fi
+        seen_workspaces["$ws"]=1
         
         valid_workspaces+=("$ws")
         valid_mtimes+=("$mtime")
