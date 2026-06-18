@@ -14,12 +14,6 @@ It reads the command execution logs and session databases, filters out deleted f
 
 ## Installation & Shell Support
 
-### 1-Line Quick Install (Recommended)
-You can install or update the plugin automatically using our installer script via `curl` or `wget`:
-```bash
-curl -sSL https://raw.githubusercontent.com/aaronbronow/agent-history/main/install.sh | bash
-```
-
 ### Zsh Frameworks (Oh My Zsh, Antidote, Zinit, Zim)
 * **Oh My Zsh**: Clone this repository into your custom plugins folder:
   ```bash
@@ -28,15 +22,17 @@ curl -sSL https://raw.githubusercontent.com/aaronbronow/agent-history/main/insta
   Then add `agent-history` to your `plugins=(...)` list in `~/.zshrc`.
 * **Antidote / Zinit**: Add `aaronbronow/agent-history` to your plugins file (`plugins.txt` for Antidote). It will automatically load via `agent-history.plugin.zsh`.
 
-### Bash Frameworks (Oh My Bash, Bash-it)
-* **Oh My Bash**: Clone the repository to `~/.oh-my-bash/custom/plugins/agent-history` and enable it in your `~/.bashrc`. It will load via `agent-history.plugin.sh`.
-
-### Fish Shell (Fisher)
-* Install via Fisher:
-  ```fish
-  fisher install aaronbronow/agent-history
-  ```
-  It will load via `conf.d/agent-history.fish`.
+### Generic Bash / Manual Installation
+1. Clone the repository to a folder of your choice:
+   ```bash
+   git clone https://github.com/aaronbronow/agent-history.git ~/.agent-history
+   ```
+2. Source the helper script in your `~/.bashrc` or `~/.zshrc` (if not using a plugin manager):
+   ```bash
+   # Add to ~/.bashrc or ~/.zshrc
+   source ~/.agent-history/agent-history.plugin.zsh  # For Zsh
+   # (For Bash, you can alias or add to PATH)
+   ```
 
 ## Usage
 
@@ -66,4 +62,18 @@ ah 2
 ## Configuration
 
 The plugin supports environment overrides:
-- `AGENT_HISTORY_PATH`: Colon-separated list of agent dot directories to search for session and chat history (e.g. `~/.antigravitycli:~/.gemini/antigravity-cli:~/.copilot`). If unset, defaults to searching all three.
+- `AGENT_HISTORY_PATH`: Colon-separated list of agent dot directories to search for session and chat history (e.g. `~/.antigravitycli:~/.gemini/antigravity-cli:~/.copilot`). If unset, defaults to searching all of them.
+
+## 🗺️ Porting to Other Shells (Contribute!)
+
+To keep the core engine highly optimized and lightweight, `agent-history` is natively written for **Zsh and generic Bash**. 
+
+If you are an avid user of **Fish, PowerShell, NuShell,** or any other environment, I would love to see this tool ported! Please feel free to fork the repository and build an implementation for your favorite shell. 
+
+### How to Port the Logic
+The core engine follows a strict 3-level resolution pattern that you can easily replicate in your native shell syntax:
+1. **Level 1 (Direct Query):** Look for global/local agent dotfiles (e.g., `~/.claude/`, `~/.gemini/`) and parse their configuration JSON or SQLite databases.
+2. **Level 2 (Text Log Scanning):** Fall back to reading chronological structured text logs (like `history.jsonl`).
+3. **Level 3 (Stream Parsing Fallback):** If heavy JSON/database tools are missing, use your shell's native pattern matching or stream filtering to safely scrape path strings directly from the raw data streams.
+
+Open an issue or submit a link to your fork so it can be highlighted here!
