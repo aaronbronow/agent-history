@@ -14,10 +14,16 @@ It reads the Antigravity command execution logs (`history.jsonl`), filters out d
 
 ## Installation
 
-### 1. Clone the Plugin
+### 1-Line Quick Install (Recommended)
+You can install or update the plugin automatically using our installer script via `curl` or `wget`:
+```bash
+curl -sSL https://raw.githubusercontent.com/aaronbronow/agent-history/main/install.sh | bash
+```
+
+### Manual Installation
 Clone this repository into your custom Oh My Zsh plugins folder:
 ```bash
-git clone https://github.com/yourusername/agent-history.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/agent-history
+git clone https://github.com/aaronbronow/agent-history.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/agent-history
 ```
 
 ### 2. Enable the Plugin
@@ -38,9 +44,9 @@ source ~/.zshrc
 ## Usage
 
 ### Display Recent Projects
-Simply type:
+Simply type `ag-recent` (or use the convenient shortcut alias `ah`):
 ```bash
-ag-recent
+ah
 ```
 Output:
 ```

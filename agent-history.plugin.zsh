@@ -36,3 +36,7 @@ if [[ -n "$SSH_CONNECTION" ]]; then
         "$script_path"
     fi
 fi
+
+# Convenient shortcut alias
+alias ah="ag-recent"
+
