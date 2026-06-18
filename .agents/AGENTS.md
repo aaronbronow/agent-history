@@ -14,9 +14,7 @@ These rules and learnings should guide future updates and maintenance tasks in t
   3. Start backtracking search (starting with `/` and index `1`), recursively trying both hyphen-join (`cur_path-next_part`) and slash-join (`cur_path/next_part`).
   4. To avoid double slashes at the root (e.g. `//tmp/...`), skip index `1` if the first split element is empty.
 
-## 3. Universal Shell Framework Integration
-- Maintain entrypoint loader files at the root of the repository to support all major shells and plugin managers:
-  - `agent-history.plugin.zsh` for OMZ, Antidote, Zinit, Zim, Zplug (Zsh)
-  - `agent-history.plugin.sh` for Oh My Bash, Bash-it (Bash)
-  - `conf.d/agent-history.fish` for Fisher, OMF (Fish)
-- When resolving paths from Fish configuration scripts (loaded by Fisher), use `status current-filename` combined with `realpath` to handle symlinks correctly.
+## 3. Scope & Development Philosophy (Open-Minded but Opinionated)
+- Focus effort on delivering a high-quality, fully optimized implementation for Zsh (the developer's primary shell) and generic Bash.
+- Avoid half-assing or maintaining unverified integrations for environments we do not use (e.g. Fish, PowerShell, NuShell).
+- Intentionally leave gaps and layout pointers in the documentation (`README.md`) to encourage open-source contributions and ports for other shells.
