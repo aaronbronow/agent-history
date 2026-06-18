@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+# Pure Bash replacement for antigravity-recent.py
+
+set -eu
+
+# Helper to format relative time
+format_relative_time() {
+    local mtime="$1"
+    local current_time
+    if [[ -n "${ANTIGRAVITY_MOCK_TIME:-}" ]]; then
+        current_time="${ANTIGRAVITY_MOCK_TIME}"
+    else
+        current_time=$(date +%s)
+    fi
+    local sec_diff=$((current_time - mtime))
+    if (( sec_diff < 0 )); then
+        echo "just now"
+    elif (( sec_diff < 60 )); then
+        echo "${sec_diff}s ago"
+    elif (( sec_diff < 3600 )); then
+        echo "$((sec_diff / 60))m ago"
+    elif (( sec_diff < 86400 )); then
+        echo "$((sec_diff / 3600))h ago"
+    else
+        echo "$((sec_diff / 86400))d ago"
+    fi
+}
+
+# Helper to get Git branch name without running git commands
+get_git_branch() {
+    local path="$1"
+    local git_path="$path/.git"
+    if [[ ! -e "$git_path" ]]; then
+        return 1
+    fi
+    if [[ -f "$git_path" ]]; then
+        local content
+        content=$(cat "$git_path" 2>/dev/null || true)
+        if [[ "$content" == "gitdir: "* ]]; then
+            local gitdir="${content#gitdir: }"
+            # Trim whitespace
+            gitdir="$(echo "$gitdir" | xargs)"
+            if [[ "$gitdir" != /* ]]; then
+                git_path="$path/$gitdir"
+            else
+                git_path="$gitdir"
+            fi
+            git_path=$(readlink -f "$git_path" 2>/dev/null || true)
+        else
+            return 1
+        fi
+    fi
+    if [[ ! -d "$git_path" ]]; then
+        return 1
+    fi
+    local head_file="$git_path/HEAD"
+    if [[ ! -f "$head_file" ]]; then
+        return 1
+    fi
+    local head_content
+    head_content=$(cat "$head_file" 2>/dev/null || true)
+    if [[ "$head_content" == "ref: refs/heads/"* ]]; then
+        echo "${head_content#ref: refs/heads/}"
+        return 0
+    elif [[ "$head_content" == "ref: "* ]]; then
+        echo "${head_content#ref: }"
+        return 0
+    elif [[ -n "$head_content" ]]; then
+        # Detached HEAD, return first 7 characters
+        # Strip trailing newline if any
+        head_content=$(echo "$head_content" | head -n 1 | xargs)
+        echo "${head_content:0:7}"
+        return 0
+    fi
+    return 1
+}
+
+# Recursive helper to backtrack and find valid directories matching hyphenated paths
+find_paths_rec() {
+    local idx="$1"
+    local cur_path="$2"
+    local num_parts="${#parts[@]}"
+    
+    if (( idx == num_parts )); then
+        if [[ -d "$cur_path" ]]; then
+            found_paths+=("$cur_path")
+        fi
+        return
+    fi
+    
+    local part="${parts[idx]}"
+    
+    # Try joining with '-'
+    find_paths_rec "$((idx + 1))" "${cur_path}-${part}"
+    
+    # Try joining with '/'
+    if [[ -d "$cur_path" ]]; then
+        find_paths_rec "$((idx + 1))" "${cur_path}/${part}"
+    fi
+}
+
+# Resolve Pi CLI session folder names (e.g. --home-aaron-dev-agent-history--) back to real paths
+resolve_encoded_path() {
+    local encoded="$1"
+    encoded="${encoded#--}"
+    encoded="${encoded%--}"
+    
+    local IFS='-'
+    local parts
+    # Disable globbing temporarily to be safe
+    set -f
+    read -r -a parts <<< "$encoded"
+    set +f
+    
+    local found_paths=()
+    if (( ${#parts[@]} > 0 )); then
+        if [[ -z "${parts[0]}" ]]; then
+            if (( ${#parts[@]} > 1 )); then
+                find_paths_rec 2 "/${parts[1]}"
+            else
+                find_paths_rec 1 "/"
+            fi
+        else
+            find_paths_rec 1 "/${parts[0]}"
+        fi
+    fi
+    
+    if (( ${#found_paths[@]} > 0 )); then
+        echo "${found_paths[0]}"
+        return 0
+    fi
+    return 1
+}
+
+
+# Helper to find the most recent session/log file in a directory
+find_most_recent_session_file() {
+    local dir="$1"
+    # Find files of interest, print mtime and path, sort descending, get the first one.
+    find -L "$dir" -type f \( \
+        -name "*.jsonl" \
+        -o -name ".project_root" \
+        -o -name "session-store.db" \
+        -o -name ".aider.input.history" \
+        -o -name ".aider.history" \
+        -o -name "*.db" \
+        -o -name "*.sqlite" \
+        -o -name "*.sqlite3" \
+        -o -path "*/conversations/*.pb" \
+        -o -path "*/brain/*/logs/transcript.jsonl" \
+        -o -path "*/brain/*/logs/transcript_full.jsonl" \
+        -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
+    \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1
+}
+
+# Helper to read workspace path from a session manifest or log file
+get_workspace_from_manifest() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+    
+    local has_jq=false
+    local has_sqlite3=false
+    hash jq 2>/dev/null && has_jq=true
+    hash sqlite3 2>/dev/null && has_sqlite3=true
+
+    if [[ "$file" == *.json ]]; then
+        local ws=""
+        if [[ "$has_jq" == "true" ]]; then
+            ws=$(jq -r '.projectResources.resources[0].folderUri // .name // .path // .workspace // .projectRoot // .project_root // empty' "$file" 2>/dev/null | sed 's|^file://||' || true)
+        fi
+        if [[ -z "$ws" ]]; then
+            # POSIX fallback parsing of JSON manifest
+            ws=$(grep -o -E '"folderUri"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"file:\/\/([^"]+)".*/\1/' || true)
+            if [[ -z "$ws" ]]; then
+                ws=$(grep -o -E '"name"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+            fi
+            if [[ -z "$ws" ]]; then
+                ws=$(grep -o -E '"(path|workspace|projectRoot|project_root)"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+            fi
+        fi
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == *.jsonl ]]; then
+        # 1. Pi CLI session check: under .pi/agent/sessions/--*--/
+        if [[ "$file" == */.pi/agent/sessions/--*--/*.jsonl ]]; then
+            local dir_name
+            dir_name=$(basename "$(dirname "$file")")
+            local ws
+            ws=$(resolve_encoded_path "$dir_name" || true)
+            if [[ -n "$ws" ]]; then
+                echo "$ws"
+                return 0
+            fi
+        fi
+
+        # 2. General history.jsonl or other JSONL workspace lookup
+        local ws=""
+        if [[ "$has_jq" == "true" ]]; then
+            ws=$(tail -n 1 "$file" | jq -r '.workspace // empty' 2>/dev/null || true)
+        fi
+        if [[ -z "$ws" ]]; then
+            # POSIX fallback parsing of JSONL
+            ws=$(tail -n 1 "$file" 2>/dev/null | grep -o -E '"workspace"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+        fi
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == */.project_root ]]; then
+        local ws
+        ws=$(cat "$file" 2>/dev/null | xargs || true)
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == */.aider.input.history || "$file" == */.aider.history ]]; then
+        local ws
+        ws=$(dirname "$file" || true)
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == *.db || "$file" == *.sqlite || "$file" == *.sqlite3 || "$file" == *.pb || "$file" == *transcript.jsonl || "$file" == *transcript_full.jsonl ]]; then
+        # 1. Check if it is OpenCode database
+        if [[ "$file" == *opencode.db ]]; then
+            if [[ "$has_sqlite3" == "true" ]]; then
+                local ws
+                ws=$(sqlite3 "$file" "select directory from session order by time_updated desc limit 1" 2>/dev/null || true)
+                if [[ -n "$ws" ]]; then
+                    echo "$ws"
+                    return 0
+                fi
+            else
+                # POSIX fallback: grep for absolute paths starting with /home or /Users
+                local ws
+                ws=$(grep -o -a -E '/(home|Users)/[a-zA-Z0-9_./-]+' "$file" 2>/dev/null | head -n 1 | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                if [[ -n "$ws" ]]; then
+                    echo "$ws"
+                    return 0
+                fi
+            fi
+        fi
+
+        local uuid
+        uuid=$(basename "$file" | sed -E 's/\.(db|pb|jsonl|sqlite|sqlite3)$//' || true)
+        if [[ "$uuid" == "transcript" || "$uuid" == "transcript_full" ]]; then
+            uuid=$(basename "$(dirname "$(dirname "$(dirname "$file")")")" || true)
+        fi
+
+        # Climb up to find conversations/ directory and history.jsonl
+        local parent_dir
+        parent_dir=$(dirname "$file")
+        local conv_dir=""
+        local hist_file=""
+        while [[ "$parent_dir" != "/" ]]; do
+            if [[ -d "$parent_dir/conversations" && -z "$conv_dir" ]]; then
+                conv_dir="$parent_dir/conversations"
+            fi
+            if [[ -f "$parent_dir/history.jsonl" && -z "$hist_file" ]]; then
+                hist_file="$parent_dir/history.jsonl"
+            fi
+            if [[ -n "$conv_dir" && -n "$hist_file" ]]; then
+                break
+            fi
+            parent_dir=$(dirname "$parent_dir")
+        done
+
+        local db_file=""
+        if [[ -n "$conv_dir" && -f "$conv_dir/$uuid.db" ]]; then
+            db_file="$conv_dir/$uuid.db"
+        fi
+
+        local ws=""
+
+        # 2. General SQLite direct extraction (Antigravity / Copilot, etc.)
+        if [[ "$has_sqlite3" == "true" && -n "$db_file" ]]; then
+            ws=$(sqlite3 "$db_file" "select data from trajectory_metadata_blob" 2>/dev/null | grep -o 'file://[^[:cntrl:] ]*' | sed 's|^file://||' | head -n 1 || true)
+        fi
+
+        # 3. Text file lookup (history.jsonl)
+        if [[ -z "$ws" && -n "$hist_file" && -f "$hist_file" ]]; then
+            local matched_line
+            matched_line=$(grep "$uuid" "$hist_file" 2>/dev/null | tail -n 1 || true)
+            if [[ -n "$matched_line" ]]; then
+                if [[ "$has_jq" == "true" ]]; then
+                    ws=$(echo "$matched_line" | jq -r '.workspace // empty' 2>/dev/null || true)
+                else
+                    ws=$(echo "$matched_line" | grep -o -E '"workspace"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+                fi
+            fi
+        fi
+
+        # 4. POSIX binary DB parsing fallback
+        if [[ -z "$ws" ]]; then
+            local fallback_db=""
+            if [[ -f "$file" && ( "$file" == *.db || "$file" == *.sqlite || "$file" == *.sqlite3 ) ]]; then
+                fallback_db="$file"
+            elif [[ -n "$db_file" ]]; then
+                fallback_db="$db_file"
+            fi
+            if [[ -n "$fallback_db" ]]; then
+                ws=$(grep -o -a -E 'file:///[^[:cntrl:]"'\'' ]*' "$fallback_db" 2>/dev/null | head -n 1 | sed 's|^file://||' | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                if [[ -z "$ws" ]]; then
+                    ws=$(grep -o -a -E '/(home|Users)/[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                fi
+            fi
+        fi
+
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+main() {
+    local verbose="false"
+    local path_idx=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --verbose)
+                verbose="true"
+                shift
+                ;;
+            --path)
+                if [[ -n "${2:-}" ]]; then
+                    path_idx="$2"
+                    shift 2
+                else
+                    echo "Error: --path requires an argument" >&2
+                    return 1
+                fi
+                ;;
+            *)
+                echo "Error: Unknown argument $1" >&2
+                return 1
+                ;;
+        esac
+    done
+
+    # Parse path list
+    local paths_list
+    if [[ -n "${AGENT_HISTORY_PATH:-}" ]]; then
+        IFS=':' read -r -a paths_list <<< "$AGENT_HISTORY_PATH"
+    else
+        paths_list=(
+            "$HOME/.antigravitycli"
+            "$HOME/.gemini"
+            "$HOME/.claude"
+            "$HOME/.copilot"
+            "$HOME/.aider"
+            "$HOME/.pi"
+            "$HOME/.droid"
+            "$HOME/.factory"
+            "$HOME/.codex"
+            "$HOME/.openclaw"
+            "$HOME/.hermes"
+            "$HOME/.local/share/opencode"
+            "$HOME/.opencode"
+        )
+    fi
+
+    local paths_checked=()
+    local matched_entries=()
+
+    for raw_path in "${paths_list[@]}"; do
+        # Trim whitespace
+        raw_path="$(echo "$raw_path" | xargs)"
+        if [[ -z "$raw_path" ]]; then
+            continue
+        fi
+        
+        # Expand ~
+        local path="${raw_path/#\~/$HOME}"
+        paths_checked+=("$raw_path")
+        
+        # If path does not exist, ignore it
+        if [[ ! -e "$path" ]]; then
+            continue
+        fi
+        
+        # Check access (read and execute for directory, read for file)
+        if [[ -d "$path" ]]; then
+            if [[ ! -r "$path" || ! -x "$path" ]]; then
+                echo "Error: No access to path $raw_path (permission denied)" >&2
+                return 1
+            fi
+        else
+            if [[ ! -r "$path" ]]; then
+                echo "Error: No access to path $raw_path (permission denied)" >&2
+                return 1
+            fi
+        fi
+        
+        # Find the most recent session or chat history file
+        local recent_res
+        recent_res=$(find_most_recent_session_file "$path" || true)
+        if [[ -z "$recent_res" ]]; then
+            continue
+        fi
+        
+        # Parse timestamp and file path
+        local timestamp="${recent_res%% *}"
+        local mtime="${timestamp%%.*}"
+        local file_path="${recent_res#* }"
+        
+        matched_entries+=("$mtime|$raw_path|$file_path")
+    done
+
+    if (( ${#matched_entries[@]} == 0 )); then
+        if [[ "$verbose" == "true" ]]; then
+            echo "Paths checked:" >&2
+            for p in "${paths_checked[@]}"; do
+                echo "  - $p" >&2
+            done
+            echo "Warning: No agent history paths matched or contained valid sessions." >&2
+        fi
+        return 0
+    fi
+
+    # Sort by mtime descending
+    local sorted_lines
+    IFS=$'\n' read -d '' -r -a sorted_lines < <(printf "%s\n" "${matched_entries[@]}" | sort -rn && printf '\0')
+
+    local valid_workspaces=()
+    local valid_mtimes=()
+    local valid_files=()
+    local count=0
+
+    for line in "${sorted_lines[@]}"; do
+        if (( count >= 5 )); then
+            break
+        fi
+        local mtime agent_path manifest_file
+        IFS='|' read -r mtime agent_path manifest_file <<< "$line"
+        
+        local ws
+        ws=$(get_workspace_from_manifest "$manifest_file" || true)
+        if [[ -z "$ws" ]]; then
+            continue
+        fi
+        
+        if [[ ! -d "$ws" ]]; then
+            continue
+        fi
+        
+        valid_workspaces+=("$ws")
+        valid_mtimes+=("$mtime")
+        valid_files+=("$manifest_file")
+        count=$((count + 1))
+    done
+
+    if [[ -n "$path_idx" ]]; then
+        # Validate it's a number
+        if [[ ! "$path_idx" =~ ^[0-9]+$ ]]; then
+            return 1
+        fi
+        local idx=$((path_idx - 1))
+        if (( idx >= 0 && idx < ${#valid_workspaces[@]} )); then
+            echo "${valid_workspaces[idx]}"
+            return 0
+        else
+            return 1
+        fi
+    fi
+
+    # Print formatted list output
+    local RESET="\033[0m"
+    local BOLD="\033[1m"
+    local CYAN="\033[36m"
+    local GREEN="\033[32m"
+    local GRAY="\033[90m"
+    local PURPLE="\033[35m"
+
+    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}"
+
+    for i in "${!valid_workspaces[@]}"; do
+        local ws="${valid_workspaces[i]}"
+        local mtime="${valid_mtimes[i]}"
+        
+        local rel_time
+        rel_time=$(format_relative_time "$mtime")
+        
+        local branch
+        branch=$(get_git_branch "$ws" || true)
+        local branch_str=""
+        if [[ -n "$branch" ]]; then
+            branch_str=" ${GREEN}(${branch})${RESET}"
+        fi
+        
+        local display_path="${ws/#$HOME/\~}"
+        
+        printf "  %d. ${CYAN}%-40s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$rel_time"
+    done
+
+    echo -e "\n💡 ${GRAY}Run ${BOLD}ag-recent <num>${RESET}${GRAY} to jump to a project folder.${RESET}\n"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

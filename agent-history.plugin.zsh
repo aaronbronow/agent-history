@@ -2,20 +2,20 @@
 # Exposes utilities to track and switch to recent Antigravity workspaces.
 
 function ag-recent() {
-    # Resolve the plugin's absolute directory to locate the python script
+    # Resolve the plugin's absolute directory to locate the bash script
     local plugin_dir="${0:A:h}"
-    local script_path="$plugin_dir/antigravity-recent.py"
+    local script_path="$plugin_dir/agent-history"
 
     if [[ ! -f "$script_path" ]]; then
-        echo "Error: antigravity-recent.py not found at $script_path" >&2
+        echo "Error: agent-history not found at $script_path" >&2
         return 1
     fi
 
     if [[ $# -eq 0 ]]; then
-        python3 "$script_path"
+        "$script_path"
     elif [[ "$1" =~ ^[1-5]$ ]]; then
         local target_dir
-        target_dir=$(python3 "$script_path" --path "$1")
+        target_dir=$("$script_path" --path "$1")
         if [[ -d "$target_dir" ]]; then
             cd "$target_dir" || return 1
         else
@@ -31,8 +31,8 @@ function ag-recent() {
 # Automatically display recent projects upon SSH login
 if [[ -n "$SSH_CONNECTION" ]]; then
     local plugin_dir="${0:A:h}"
-    local script_path="$plugin_dir/antigravity-recent.py"
+    local script_path="$plugin_dir/agent-history"
     if [[ -f "$script_path" ]]; then
-        python3 "$script_path"
+        "$script_path"
     fi
 fi

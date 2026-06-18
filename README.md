@@ -63,4 +63,4 @@ ag-recent 2
 ## Configuration
 
 The plugin supports environment overrides:
-- `ANTIGRAVITY_HISTORY_FILE`: Path to custom execution history file (defaults to `~/.gemini/antigravity-cli/history.jsonl`).
+- `AGENT_HISTORY_PATH`: Colon-separated list of agent dot directories to search for session and chat history (e.g. `~/.antigravitycli:~/.gemini/antigravity-cli:~/.copilot`). If unset, defaults to searching all three.
