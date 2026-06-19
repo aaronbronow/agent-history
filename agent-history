@@ -35,11 +35,12 @@ get_git_branch() {
     fi
     if [[ -f "$git_path" ]]; then
         local content
-        content=$(cat "$git_path" 2>/dev/null || true)
+        content=$(< "$git_path") 2>/dev/null || true
         if [[ "$content" == "gitdir: "* ]]; then
             local gitdir="${content#gitdir: }"
-            # Trim whitespace
-            gitdir="$(echo "$gitdir" | xargs)"
+            # Trim whitespace using Bash builtins
+            gitdir="${gitdir##[[:space:]]}"
+            gitdir="${gitdir%%[[:space:]]}"
             if [[ "$gitdir" != /* ]]; then
                 git_path="$path/$gitdir"
             else
@@ -58,7 +59,7 @@ get_git_branch() {
         return 1
     fi
     local head_content
-    head_content=$(cat "$head_file" 2>/dev/null || true)
+    head_content=$(< "$head_file") 2>/dev/null || true
     if [[ "$head_content" == "ref: refs/heads/"* ]]; then
         echo "${head_content#ref: refs/heads/}"
         return 0
@@ -67,9 +68,12 @@ get_git_branch() {
         return 0
     elif [[ -n "$head_content" ]]; then
         # Detached HEAD, return first 7 characters
-        # Strip trailing newline if any
-        head_content=$(echo "$head_content" | head -n 1 | xargs)
-        echo "${head_content:0:7}"
+        # Get first line and trim whitespace using Bash builtins
+        local first_line
+        read -r first_line <<< "$head_content" || true
+        first_line="${first_line##[[:space:]]}"
+        first_line="${first_line%%[[:space:]]}"
+        echo "${first_line:0:7}"
         return 0
     fi
     return 1
@@ -153,6 +157,10 @@ find_recent_session_files() {
     \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 50
 }
 
+# Global capability cache variables
+_HAS_JQ=""
+_HAS_SQLITE3=""
+
 # Helper to read workspace path from a session manifest or log file
 get_workspace_from_manifest() {
     local file="$1"
@@ -160,10 +168,15 @@ get_workspace_from_manifest() {
         return 1
     fi
     
-    local has_jq=false
-    local has_sqlite3=false
-    hash jq 2>/dev/null && has_jq=true
-    hash sqlite3 2>/dev/null && has_sqlite3=true
+    if [[ -z "$_HAS_JQ" ]]; then
+        if hash jq 2>/dev/null; then _HAS_JQ="true"; else _HAS_JQ="false"; fi
+    fi
+    if [[ -z "$_HAS_SQLITE3" ]]; then
+        if hash sqlite3 2>/dev/null; then _HAS_SQLITE3="true"; else _HAS_SQLITE3="false"; fi
+    fi
+
+    local has_jq="$_HAS_JQ"
+    local has_sqlite3="$_HAS_SQLITE3"
 
     if [[ "$file" == *.json ]]; then
         local ws=""
@@ -212,14 +225,15 @@ get_workspace_from_manifest() {
         fi
     elif [[ "$file" == */.project_root ]]; then
         local ws
-        ws=$(cat "$file" 2>/dev/null | xargs || true)
+        read -r ws < "$file" 2>/dev/null || true
+        ws="${ws##[[:space:]]}"
+        ws="${ws%%[[:space:]]}"
         if [[ -n "$ws" ]]; then
             echo "$ws"
             return 0
         fi
     elif [[ "$file" == */.aider.input.history || "$file" == */.aider.history ]]; then
-        local ws
-        ws=$(dirname "$file" || true)
+        local ws="${file%/*}"
         if [[ -n "$ws" ]]; then
             echo "$ws"
             return 0
@@ -351,7 +365,8 @@ main() {
     else
         paths_list=(
             "$HOME/.antigravitycli"
-            "$HOME/.gemini"
+            "$HOME/.gemini/antigravity-cli"
+            "$HOME/.gemini/history"
             "$HOME/.claude"
             "$HOME/.copilot"
             "$HOME/.aider"
@@ -370,15 +385,16 @@ main() {
     local matched_entries=()
 
     for raw_path in "${paths_list[@]}"; do
-        # Trim whitespace
-        raw_path="$(echo "$raw_path" | xargs)"
-        if [[ -z "$raw_path" ]]; then
+        # Trim whitespace using Bash builtins
+        local trimmed_path="${raw_path##[[:space:]]}"
+        trimmed_path="${trimmed_path%%[[:space:]]}"
+        if [[ -z "$trimmed_path" ]]; then
             continue
         fi
         
         # Expand ~
-        local path="${raw_path/#\~/$HOME}"
-        paths_checked+=("$raw_path")
+        local path="${trimmed_path/#\~/$HOME}"
+        paths_checked+=("$trimmed_path")
         
         # If path does not exist, ignore it
         if [[ ! -e "$path" ]]; then
@@ -388,17 +404,21 @@ main() {
         # Check access (read and execute for directory, read for file)
         if [[ -d "$path" ]]; then
             if [[ ! -r "$path" || ! -x "$path" ]]; then
-                echo "Error: No access to path $raw_path (permission denied)" >&2
+                echo "Error: No access to path $trimmed_path (permission denied)" >&2
                 return 1
             fi
         else
             if [[ ! -r "$path" ]]; then
-                echo "Error: No access to path $raw_path (permission denied)" >&2
+                echo "Error: No access to path $trimmed_path (permission denied)" >&2
                 return 1
             fi
         fi
         
-        # Find the recent session or chat history files
+        existing_paths+=("$path")
+    done
+
+    if (( ${#existing_paths[@]} > 0 )); then
+        # Run find ONCE for all existing paths combined
         while read -r recent_res; do
             if [[ -z "$recent_res" ]]; then
                 continue
@@ -409,9 +429,32 @@ main() {
             local mtime="${timestamp%%.*}"
             local file_path="${recent_res#* }"
             
-            matched_entries+=("$mtime|$raw_path|$file_path")
-        done < <(find_recent_session_files "$path" || true)
-    done
+            # Identify which raw path this file belongs to (for verbose/tracking)
+            local matched_raw=""
+            for raw_path in "${paths_checked[@]}"; do
+                local p="${raw_path/#\~/$HOME}"
+                if [[ "$file_path" == "$p"* ]]; then
+                    matched_raw="$raw_path"
+                    break
+                fi
+            done
+            
+            matched_entries+=("$mtime|$matched_raw|$file_path")
+        done < <(find -L "${existing_paths[@]}" -type f \( \
+            -name "*.jsonl" \
+            -o -name ".project_root" \
+            -o -name "session-store.db" \
+            -o -name ".aider.input.history" \
+            -o -name ".aider.history" \
+            -o -name "*.db" \
+            -o -name "*.sqlite" \
+            -o -name "*.sqlite3" \
+            -o -path "*/conversations/*.pb" \
+            -o -path "*/brain/*/logs/transcript.jsonl" \
+            -o -path "*/brain/*/logs/transcript_full.jsonl" \
+            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
+        \) ! -path "*/.system_generated/*" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
+    fi
 
     if (( ${#matched_entries[@]} == 0 )); then
         if [[ "$verbose" == "true" ]]; then
