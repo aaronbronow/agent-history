@@ -282,6 +282,38 @@ test_shrink_path() {
     assert_equals "/a/b/c" "$(shrink_path "/a/b/c")" "3 parts path"
 }
 
+test_version_flag() {
+    echo "Running test_version_flag..."
+    local script_bin="$SCRIPT_DIR/../agent-history"
+    
+    local version_out_short
+    version_out_short=$("$script_bin" -v)
+    assert_equals "agent-history 1.0.0" "$version_out_short" "-v flag output"
+    
+    local version_out_long
+    version_out_long=$("$script_bin" --version)
+    assert_equals "agent-history 1.0.0" "$version_out_long" "--version flag output"
+}
+
+test_help_flag() {
+    echo "Running test_help_flag..."
+    local script_bin="$SCRIPT_DIR/../agent-history"
+    
+    local help_out_short
+    help_out_short=$("$script_bin" -h)
+    if [[ ! "$help_out_short" == *"https://github.com/aaronbronow/agent-history"* ]]; then
+        echo "FAIL: -h flag output does not contain repo URL" >&2
+        exit 1
+    fi
+    
+    local help_out_long
+    help_out_long=$("$script_bin" --help)
+    if [[ ! "$help_out_long" == *"https://github.com/aaronbronow/agent-history"* ]]; then
+        echo "FAIL: --help flag output does not contain repo URL" >&2
+        exit 1
+    fi
+}
+
 # Run all tests
 test_format_relative_time
 test_get_git_branch_standard
@@ -297,6 +329,8 @@ test_resolve_encoded_path
 test_get_workspace_from_manifest_pi
 test_get_workspace_from_manifest_opencode
 test_shrink_path
+test_version_flag
+test_help_flag
 
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 

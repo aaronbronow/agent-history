@@ -1,5 +1,6 @@
 # Generic Bash/Zsh loader for agent-history
 # Exposes utilities to track and switch to recent workspaces.
+# Version: 1.0.0
 
 function agent-history() {
     # Resolve the plugin's absolute directory to locate the script
@@ -24,8 +25,7 @@ function agent-history() {
             return 1
         fi
     else
-        echo "Usage: ah [1-5]" >&2
-        return 1
+        "$script_path" "$@"
     fi
 }
 

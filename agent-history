@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Pure Bash replacement for antigravity-recent.py
+# Version: 1.0.0
 
 set -eu
 
@@ -369,6 +370,26 @@ get_workspace_from_manifest() {
     return 1
 }
 
+show_help() {
+    cat << 'EOF'
+Usage: ah [num] | [options]
+
+Fast recent workspaces list and quick-jump utility.
+
+Options:
+  -h, --help     Show this help message and exit
+  -v, --version  Show version and exit
+  --verbose      Print diagnostic information on empty runs
+
+Interactive Quick-Jump:
+  ah             List the 5 most recent agent workspaces
+  ah <1-5>       Instantly change directory (cd) to the specified workspace
+
+Contributors & Repository:
+  https://github.com/aaronbronow/agent-history
+EOF
+}
+
 main() {
     local verbose="false"
     local path_idx=""
@@ -378,6 +399,14 @@ main() {
             --verbose)
                 verbose="true"
                 shift
+                ;;
+            -h|--help)
+                show_help
+                return 0
+                ;;
+            -v|--version)
+                echo "agent-history 1.0.0"
+                return 0
                 ;;
             --path)
                 if [[ -n "${2:-}" ]]; then
