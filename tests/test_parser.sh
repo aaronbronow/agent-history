@@ -312,6 +312,13 @@ test_help_flag() {
         echo "FAIL: --help flag output does not contain repo URL" >&2
         exit 1
     fi
+
+    local help_out_question
+    help_out_question=$("$script_bin" "-?")
+    if [[ ! "$help_out_question" == *"https://github.com/aaronbronow/agent-history"* ]]; then
+        echo "FAIL: -? flag output does not contain repo URL" >&2
+        exit 1
+    fi
 }
 
 # Run all tests

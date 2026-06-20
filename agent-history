@@ -400,7 +400,7 @@ main() {
                 verbose="true"
                 shift
                 ;;
-            -h|--help)
+            -\?|-h|--help)
                 show_help
                 return 0
                 ;;
