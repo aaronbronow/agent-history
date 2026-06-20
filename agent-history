@@ -382,8 +382,11 @@ Options:
   --verbose      Print diagnostic information on empty runs
 
 Interactive Quick-Jump:
-  ah             List the 5 most recent agent workspaces
-  ah <1-5>       Instantly change directory (cd) to the specified workspace
+  ah             List recent agent workspaces
+  ah <num>       Instantly change directory (cd) to the specified workspace
+
+Configuration:
+  AGENT_HISTORY_LIMIT   Number of workspaces to display (default: 5, max: 25)
 
 Contributors & Repository:
   https://github.com/aaronbronow/agent-history
@@ -393,6 +396,16 @@ EOF
 main() {
     local verbose="false"
     local path_idx=""
+    local limit=5
+    local max_limit=25
+    if [[ -n "${AGENT_HISTORY_LIMIT:-}" ]]; then
+        if [[ "${AGENT_HISTORY_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+            limit="${AGENT_HISTORY_LIMIT}"
+            if (( limit > max_limit )); then
+                limit=$max_limit
+            fi
+        fi
+    fi
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -544,7 +557,7 @@ main() {
     local -A seen_workspaces
 
     for line in "${sorted_lines[@]}"; do
-        if (( count >= 5 )); then
+        if (( count >= limit )); then
             break
         fi
         local mtime agent_path manifest_file

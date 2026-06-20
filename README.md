@@ -72,6 +72,7 @@ ah 2
 
 The plugin supports environment overrides:
 - `AGENT_HISTORY_PATH`: Colon-separated list of agent dot directories to search for session and chat history (e.g. `~/.antigravitycli:~/.gemini/antigravity-cli:~/.copilot`). If unset, defaults to searching all of them.
+- `AGENT_HISTORY_LIMIT`: Number of recent projects to display in the list (default is `5`, maximum is `25` to maintain sub-200ms prompt loading performance).
 
 ## 🗺️ Porting to Other Shells (Contribute!)
 

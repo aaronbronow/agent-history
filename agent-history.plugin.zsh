@@ -15,13 +15,13 @@ function agent-history() {
 
     if [[ $# -eq 0 ]]; then
         "$script_path"
-    elif [[ "$1" =~ ^[1-5]$ ]]; then
+    elif [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
         local target_dir
         target_dir=$("$script_path" --path "$1")
         if [[ -d "$target_dir" ]]; then
             cd "$target_dir" || return 1
         else
-            echo "Error: Directory not found: $target_dir" >&2
+            echo "Error: Directory not found or out of range: $target_dir" >&2
             return 1
         fi
     else

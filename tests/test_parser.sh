@@ -321,6 +321,58 @@ test_help_flag() {
     fi
 }
 
+test_history_limit() {
+    echo "Running test_history_limit..."
+    local script_bin="$SCRIPT_DIR/../agent-history"
+    local temp_path
+    temp_path=$(mktemp -d)
+    
+    # Create 10 different workspace directories and corresponding .project_root files
+    local i
+    for i in {1..10}; do
+        local ws="$temp_path/ws_$i"
+        mkdir -p "$ws"
+        # Create a mock session file in each
+        local pr_file="$ws/.project_root"
+        echo "$ws" > "$pr_file"
+        # Set different mtimes to ensure deterministic sorting order
+        local t_val
+        t_val=$(printf "2026062000%02d" "$i")
+        touch -m -t "$t_val" "$pr_file"
+    done
+    
+    # Use only our temp path for searches
+    export AGENT_HISTORY_PATH="$temp_path"
+    
+    # Test default limit (should print 5 items)
+    local out_default
+    out_default=$(AGENT_HISTORY_LIMIT= "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "5" "$out_default" "Default limit count"
+    
+    # Test limit set to 3
+    local out_3
+    out_3=$(AGENT_HISTORY_LIMIT=3 "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "3" "$out_3" "Limit set to 3"
+    
+    # Test limit set to 8
+    local out_8
+    out_8=$(AGENT_HISTORY_LIMIT=8 "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "8" "$out_8" "Limit set to 8"
+    
+    # Test limit set to 50 (should ceiling to max_limit=25, or since we only have 10, should show 10)
+    local out_50
+    out_50=$(AGENT_HISTORY_LIMIT=50 "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "10" "$out_50" "Limit set to 50 with 10 available workspaces"
+    
+    # Test invalid limit (negative or non-numeric) fallback to default (5)
+    local out_invalid
+    out_invalid=$(AGENT_HISTORY_LIMIT=abc "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "5" "$out_invalid" "Invalid limit fallback count"
+    
+    unset AGENT_HISTORY_PATH
+    rm -rf "$temp_path"
+}
+
 # Run all tests
 test_format_relative_time
 test_get_git_branch_standard
@@ -338,6 +390,7 @@ test_get_workspace_from_manifest_opencode
 test_shrink_path
 test_version_flag
 test_help_flag
+test_history_limit
 
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 
