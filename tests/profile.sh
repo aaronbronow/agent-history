@@ -61,7 +61,7 @@ profile_runs() {
             -o -path "*/conversations/*.pb" \
             -o -path "*/brain/*/logs/transcript.jsonl" \
             -o -path "*/brain/*/logs/transcript_full.jsonl" \
-            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
+            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
         \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
     fi
     local end_find=$(get_time_ns)
