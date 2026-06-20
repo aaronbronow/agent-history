@@ -301,22 +301,22 @@ test_help_flag() {
     
     local help_out_short
     help_out_short=$("$script_bin" -h)
-    if [[ ! "$help_out_short" == *"https://github.com/aaronbronow/agent-history"* ]]; then
-        echo "FAIL: -h flag output does not contain repo URL" >&2
+    if [[ ! "$help_out_short" == *"https://github.com/aaronbronow/agent-history"* || ! "$help_out_short" == *"AGENT_HISTORY_PATH"* ]]; then
+        echo "FAIL: -h flag output does not contain expected help sections" >&2
         exit 1
     fi
     
     local help_out_long
     help_out_long=$("$script_bin" --help)
-    if [[ ! "$help_out_long" == *"https://github.com/aaronbronow/agent-history"* ]]; then
-        echo "FAIL: --help flag output does not contain repo URL" >&2
+    if [[ ! "$help_out_long" == *"https://github.com/aaronbronow/agent-history"* || ! "$help_out_long" == *"AGENT_HISTORY_PATH"* ]]; then
+        echo "FAIL: --help flag output does not contain expected help sections" >&2
         exit 1
     fi
 
     local help_out_question
     help_out_question=$("$script_bin" "-?")
-    if [[ ! "$help_out_question" == *"https://github.com/aaronbronow/agent-history"* ]]; then
-        echo "FAIL: -? flag output does not contain repo URL" >&2
+    if [[ ! "$help_out_question" == *"https://github.com/aaronbronow/agent-history"* || ! "$help_out_question" == *"AGENT_HISTORY_PATH"* ]]; then
+        echo "FAIL: -? flag output does not contain expected help sections" >&2
         exit 1
     fi
 }

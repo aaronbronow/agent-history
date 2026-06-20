@@ -387,6 +387,7 @@ Interactive Quick-Jump:
 
 Configuration:
   AGENT_HISTORY_LIMIT   Number of workspaces to display (default: 5, max: 25)
+  AGENT_HISTORY_PATH    Colon-separated list of agent history paths to search
 
 Contributors & Repository:
   https://github.com/aaronbronow/agent-history
