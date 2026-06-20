@@ -374,7 +374,7 @@ show_help() {
     cat << 'EOF'
 Usage: ah [num] | [options]
 
-Fast recent workspaces list and quick-jump utility.
+Recent agent session viewer and jump to workspace utility.
 
 Options:
   -h, --help     Show this help message and exit
