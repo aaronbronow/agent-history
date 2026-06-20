@@ -136,6 +136,43 @@ resolve_encoded_path() {
     return 1
 }
 
+# Helper to shrink long paths to 1-letter leading directories (e.g. ~/d/s/project)
+shrink_path() {
+    local path="$1"
+    local IFS='/'
+    local parts
+    # Disable globbing temporarily
+    set -f
+    read -r -a parts <<< "$path"
+    set +f
+    
+    local num_parts="${#parts[@]}"
+    if (( num_parts <= 2 )); then
+        echo "$path"
+        return
+    fi
+    
+    local result=""
+    local first_part="${parts[0]}"
+    if [[ -z "$first_part" && "$path" == /* ]]; then
+        result=""
+    else
+        result="$first_part"
+    fi
+    
+    for (( i=1; i < num_parts - 1; i++ )); do
+        local part="${parts[i]}"
+        if [[ -z "$part" ]]; then
+            result="${result}/"
+        else
+            result="${result}/${part:0:1}"
+        fi
+    done
+    
+    result="${result}/${parts[num_parts-1]}"
+    echo "$result"
+}
+
 
 # Helper to find recent session/log files in a directory
 find_recent_session_files() {
@@ -568,6 +605,22 @@ main() {
         fi
         
         local display_path="${ws/#$HOME/\~}"
+        
+        # Calculate length of other display elements to check if path needs to be shrunk
+        local other_len=5
+        if [[ -n "$branch" ]]; then
+            other_len=$(( other_len + ${#branch} + 3 ))
+        fi
+        other_len=$(( other_len + ${#rel_time} + 3 ))
+        
+        local avail_width=$(( term_width - other_len ))
+        if (( avail_width < 15 )); then
+            avail_width=15
+        fi
+        
+        if (( ${#display_path} > avail_width )); then
+            display_path=$(shrink_path "$display_path")
+        fi
         
         if (( pad_width > 0 )); then
             printf "  %d. ${CYAN}%-*s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$pad_width" "$display_path" "$branch_str" "$rel_time"

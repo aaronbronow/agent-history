@@ -273,6 +273,15 @@ test_get_workspace_from_manifest_opencode() {
     rm -rf "$test_dir"
 }
 
+test_shrink_path() {
+    echo "Running test_shrink_path..."
+    assert_equals "foo" "$(shrink_path "foo")" "Short path (no directories)"
+    assert_equals "foo/bar" "$(shrink_path "foo/bar")" "Short path (2 parts)"
+    assert_equals "~/d/s/jobsearch" "$(shrink_path "~/dev/scratch/jobsearch")" "OMZ style path"
+    assert_equals "/h/a/d/s/jobsearch" "$(shrink_path "/home/aaron/dev/scratch/jobsearch")" "Absolute path"
+    assert_equals "/a/b/c" "$(shrink_path "/a/b/c")" "3 parts path"
+}
+
 # Run all tests
 test_format_relative_time
 test_get_git_branch_standard
@@ -287,6 +296,7 @@ test_get_workspace_from_manifest_aider
 test_resolve_encoded_path
 test_get_workspace_from_manifest_pi
 test_get_workspace_from_manifest_opencode
+test_shrink_path
 
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 
