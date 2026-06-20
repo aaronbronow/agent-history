@@ -29,12 +29,22 @@ function agent-history() {
     fi
 }
 
-# Automatically display recent projects upon SSH login
-if [[ -n "$SSH_CONNECTION" ]]; then
+# Helper function to run once at startup after zsh finishes initializing
+_agent_history_ssh_init() {
+    # Deregister function from precmd hooks so it only runs once
+    autoload -Uz add-zsh-hook
+    add-zsh-hook -d precmd _agent_history_ssh_init
+    
     local script_path="$_AGENT_HISTORY_DIR/agent-history"
     if [[ -f "$script_path" ]]; then
         "$script_path"
     fi
+}
+
+# Automatically display recent projects upon SSH login (delayed to prevent Powerlevel10k instant prompt warning)
+if [[ -n "$SSH_CONNECTION" ]]; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd _agent_history_ssh_init
 fi
 
 # Convenient shortcut alias
