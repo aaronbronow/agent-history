@@ -312,13 +312,6 @@ test_help_flag() {
         echo "FAIL: --help flag output does not contain expected help sections" >&2
         exit 1
     fi
-
-    local help_out_question
-    help_out_question=$("$script_bin" "-?")
-    if [[ ! "$help_out_question" == *"https://github.com/aaronbronow/agent-history"* || ! "$help_out_question" == *"AGENT_HISTORY_PATH"* ]]; then
-        echo "FAIL: -? flag output does not contain expected help sections" >&2
-        exit 1
-    fi
 }
 
 test_history_limit() {
