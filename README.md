@@ -10,6 +10,9 @@ It reads the command execution logs and session databases, filters out deleted f
 - **Git Branch Integration**: Shows the current active Git branch (works with standard git repositories and git worktrees).
 - **Directory Validation**: Automatically filters out projects that have been renamed or deleted.
 - **SSH Auto-run Dashboard**: Automatically prints the dashboard on login when establishing an SSH session.
+- **Adaptive Mobile Layout**: Dynamically adjusts padding on narrow screens to prevent lines from wrapping.
+- **Smart Path Shrinking**: Shortens intermediate directory names to 1 letter (e.g. `~/d/s/jobsearch` -> `~/d/s/jobsearch`) if the path exceeds the terminal width, keeping the project's leaf folder intact.
+- **High-Performance (Under 200ms)**: Consolidates search queries into a single `find` run and leverages pure Bash built-ins to eliminate subprocess fork overhead, keeping shell load times completely lag-free.
 - **Quick Shell Navigation (`ah <num>`)**: Jump directly to a project directory.
 
 ## Installation & Shell Support
