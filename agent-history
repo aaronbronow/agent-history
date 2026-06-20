@@ -540,6 +540,17 @@ main() {
     local GRAY="\033[90m"
     local PURPLE="\033[35m"
 
+    # Calculate padding dynamically based on terminal width to prevent line wrapping on narrow/mobile screens
+    local term_width
+    term_width=$(tput cols 2>/dev/null || echo 80)
+    local pad_width=40
+    if (( term_width < 80 )); then
+        pad_width=$(( term_width - 30 ))
+        if (( pad_width < 0 )); then
+            pad_width=0
+        fi
+    fi
+
     echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}"
 
     for i in "${!valid_workspaces[@]}"; do
@@ -558,7 +569,11 @@ main() {
         
         local display_path="${ws/#$HOME/\~}"
         
-        printf "  %d. ${CYAN}%-40s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$rel_time"
+        if (( pad_width > 0 )); then
+            printf "  %d. ${CYAN}%-*s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$pad_width" "$display_path" "$branch_str" "$rel_time"
+        else
+            printf "  %d. ${CYAN}%s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$rel_time"
+        fi
     done
 
     echo -e "\n💡 ${GRAY}Run ${BOLD}ah <num>${RESET}${GRAY} to jump to a project folder.${RESET}\n"
