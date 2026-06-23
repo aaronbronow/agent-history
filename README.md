@@ -1,8 +1,8 @@
 # agent-history plugin
 
-A universal shell plugin (supporting Zsh, Bash, and Fish) to track and easily navigate to your most recent projects and workspaces where you have been chatting with AI coding assistants (such as Antigravity, Claude Code, Copilot, Aider, and Pi).
+The fastest shell shortcut to resume your recent AI coding sessions before your terminal cools down.
 
-It reads the command execution logs and session databases, filters out deleted folders and your root home directory, and displays a beautiful status dashboard of the top 5 projects sorted by recency.
+It reads execution logs and session databases from AI coding assistants (such as Antigravity, Claude Code, Copilot, Aider, and Pi), filters out deleted folders and home directory roots, and displays a beautiful status dashboard of your most recent sessions.
 
 ## Features
 
