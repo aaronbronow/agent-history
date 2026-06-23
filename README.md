@@ -53,13 +53,13 @@ ah
 Output:
 ```
 ⚡ Recent Antigravity Projects
-  1. ~/dev/scratch/wp                         (23h ago)
-  2. ~/dev/scratch/threads-reader             (main) (23h ago)
-  3. ~/dev/yaml/pyyaml                        (dos-in-merge-key) (1d ago)
-  4. ~/dev/scratch/gsig_app                   (bookstore-app) (2d ago)
-  5. ~/dev/packablock                         (main) (4d ago)
+  1. ~/dev/chat-bot                           (main) (2m ago)
+  2. ~/projects/next-auth                     (oauth-fix) (1h ago)
+  3. ~/src/web-scraper                        (main) (3h ago)
+  4. ~/work/pricing-api                       (feature-rules) (1d ago)
+  5. ~/personal/dotfiles                      (main) (3d ago)
 
-💡 Run ah <num> to jump to a project folder.
+💡 Run ah <num> to jump to a project folder. (showing 5 most recent)
 ```
 
 ### Quick Jump
