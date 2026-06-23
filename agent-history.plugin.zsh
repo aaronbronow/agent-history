@@ -29,19 +29,6 @@ function agent-history() {
     fi
 }
 
-# Helper function to run once at startup after zsh finishes initializing
-_agent_history_ssh_init() {
-    local script_path="$_AGENT_HISTORY_DIR/agent-history"
-    if [[ -f "$script_path" ]]; then
-        "$script_path"
-    fi
-}
-
-# Automatically display recent projects upon SSH login (scheduled to prevent Powerlevel10k instant prompt warning)
-if [[ -n "$SSH_CONNECTION" ]]; then
-    sched +1 _agent_history_ssh_init
-fi
-
 # Convenient shortcut alias
 alias ah="agent-history"
 

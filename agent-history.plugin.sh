@@ -29,28 +29,5 @@ function agent-history() {
     fi
 }
 
-# Automatically display recent projects upon SSH login
-if [[ -n "$SSH_CONNECTION" ]]; then
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        _agent_history_ssh_init() {
-            local plugin_dir
-            plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-            local script_path="$plugin_dir/agent-history"
-            if [[ -f "$script_path" ]]; then
-                "$script_path"
-            fi
-        }
-        # Schedule to run at the very first opportunity after shell starts
-        sched +1 _agent_history_ssh_init
-    else
-        local plugin_dir
-        plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        local script_path="$plugin_dir/agent-history"
-        if [[ -f "$script_path" ]]; then
-            "$script_path"
-        fi
-    fi
-fi
-
 # Convenient shortcut alias
 alias ah="agent-history"
