@@ -362,6 +362,22 @@ test_history_limit() {
     out_invalid=$(AGENT_HISTORY_LIMIT=abc "$script_bin" | grep -c -E '^[[:space:]]+[0-9]+\. ')
     assert_equals "5" "$out_invalid" "Invalid limit fallback count"
     
+    # Test has_more suffix (should say "(showing 5+)")
+    local header_default
+    header_default=$(AGENT_HISTORY_LIMIT=5 "$script_bin" | grep -F "Recent Antigravity Projects")
+    if [[ ! "$header_default" == *"(showing 5+)"* ]]; then
+        echo "FAIL: header output when has_more=true does not contain (showing 5+)" >&2
+        exit 1
+    fi
+
+    # Test no has_more suffix when showing all results
+    local header_all
+    header_all=$(AGENT_HISTORY_LIMIT=50 "$script_bin" | grep -F "Recent Antigravity Projects")
+    if [[ "$header_all" == *"(showing"* ]]; then
+        echo "FAIL: header output when has_more=false contains (showing)" >&2
+        exit 1
+    fi
+
     unset AGENT_HISTORY_PATH
     rm -rf "$temp_path"
 }

@@ -556,9 +556,15 @@ main() {
     local valid_files=()
     local count=0
     local -A seen_workspaces
+    local has_more="false"
+    local idx_line=0
 
     for line in "${sorted_lines[@]}"; do
+        idx_line=$((idx_line + 1))
         if (( count >= limit )); then
+            if (( idx_line <= ${#sorted_lines[@]} )); then
+                has_more="true"
+            fi
             break
         fi
         local mtime agent_path manifest_file
@@ -636,7 +642,12 @@ main() {
         fi
     fi
 
-    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}${dev_str}"
+    local suffix=""
+    if [[ "$has_more" == "true" ]]; then
+        suffix=" ${GRAY}(showing ${count}+)${RESET}"
+    fi
+
+    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}${suffix}${dev_str}"
 
     for i in "${!valid_workspaces[@]}"; do
         local ws="${valid_workspaces[i]}"
