@@ -41,7 +41,7 @@ if [[ -n "$SSH_CONNECTION" ]]; then
             fi
         }
         # Schedule to run at the very first opportunity after shell starts
-        sched +0 _agent_history_ssh_init
+        sched +1 _agent_history_ssh_init
     else
         local plugin_dir
         plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -39,7 +39,7 @@ _agent_history_ssh_init() {
 
 # Automatically display recent projects upon SSH login (scheduled to prevent Powerlevel10k instant prompt warning)
 if [[ -n "$SSH_CONNECTION" ]]; then
-    sched +0 _agent_history_ssh_init
+    sched +1 _agent_history_ssh_init
 fi
 
 # Convenient shortcut alias
