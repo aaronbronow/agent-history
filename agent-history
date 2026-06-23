@@ -642,12 +642,7 @@ main() {
         fi
     fi
 
-    local suffix=""
-    if [[ "$has_more" == "true" ]]; then
-        suffix=" ${GRAY}(showing ${count}+)${RESET}"
-    fi
-
-    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}${suffix}${dev_str}"
+    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}${dev_str}"
 
     for i in "${!valid_workspaces[@]}"; do
         local ws="${valid_workspaces[i]}"
@@ -688,7 +683,11 @@ main() {
         fi
     done
 
-    echo -e "\n💡 ${GRAY}Run ${BOLD}ah <num>${RESET}${GRAY} to jump to a project folder.${RESET}\n"
+    local suffix=""
+    if [[ "$has_more" == "true" ]]; then
+        suffix=" ${GRAY}(showing ${count} most recent)${RESET}"
+    fi
+    echo -e "\n💡 ${GRAY}Run ${BOLD}ah <num>${RESET}${GRAY} to jump to a project folder.${RESET}${suffix}\n"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
