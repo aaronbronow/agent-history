@@ -48,11 +48,13 @@ _agent_history_ssh_init() {
         add-zsh-hook -d precmd _agent_history_ssh_init
         
         if (( $+functions[p10k-on-pre-prompt] )); then
-            functions[_agent_history_old_p10k_pre_prompt]=$functions[p10k-on-pre-prompt]
-            p10k-on-pre-prompt() {
-                _agent_history_old_p10k_pre_prompt "$@"
-                _agent_history_p10k_pre_prompt "$@"
-            }
+            if (( ! $+functions[_agent_history_old_p10k_pre_prompt] )); then
+                functions[_agent_history_old_p10k_pre_prompt]=$functions[p10k-on-pre-prompt]
+                p10k-on-pre-prompt() {
+                    _agent_history_old_p10k_pre_prompt "$@"
+                    _agent_history_p10k_pre_prompt "$@"
+                }
+            fi
         else
             p10k-on-pre-prompt() {
                 _agent_history_p10k_pre_prompt "$@"
