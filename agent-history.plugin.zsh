@@ -29,10 +29,35 @@ function agent-history() {
     fi
 }
 
+# Helper function to run once at startup when p10k is ready
+_agent_history_p10k_pre_prompt() {
+    if [[ -z "${_agent_history_run_once:-}" ]]; then
+        _agent_history_run_once=1
+        local script_path="$_AGENT_HISTORY_DIR/agent-history"
+        if [[ -f "$script_path" ]]; then
+            "$script_path"
+        fi
+    fi
+}
+
 # Helper function to run once at startup after zsh finishes initializing
 _agent_history_ssh_init() {
-    # If Powerlevel10k instant prompt is active, defer execution to a later precmd
-    if [[ -n "${P9K_INSTANT:-}" || "${P9K_TTY:-}" == "old" ]]; then
+    # If Powerlevel10k is active, hook into p10k-on-pre-prompt and deregister from precmd
+    if (( $+functions[p10k] )); then
+        autoload -Uz add-zsh-hook
+        add-zsh-hook -d precmd _agent_history_ssh_init
+        
+        if (( $+functions[p10k-on-pre-prompt] )); then
+            functions[_agent_history_old_p10k_pre_prompt]=$functions[p10k-on-pre-prompt]
+            p10k-on-pre-prompt() {
+                _agent_history_old_p10k_pre_prompt "$@"
+                _agent_history_p10k_pre_prompt "$@"
+            }
+        else
+            p10k-on-pre-prompt() {
+                _agent_history_p10k_pre_prompt "$@"
+            }
+        fi
         return
     fi
 
