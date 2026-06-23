@@ -33,46 +33,6 @@ function agent-history() {
 if [[ -n "$SSH_CONNECTION" ]]; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         _agent_history_ssh_init() {
-            if (( $+functions[p10k] )); then
-                autoload -Uz add-zsh-hook
-                add-zsh-hook -d precmd _agent_history_ssh_init
-                
-                _agent_history_p10k_pre_prompt() {
-                    if [[ -z "${_agent_history_run_once:-}" ]]; then
-                        _agent_history_run_once=1
-                        local plugin_dir
-                        plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-                        local script_path="$plugin_dir/agent-history"
-                        if [[ -f "$script_path" ]]; then
-                            "$script_path"
-                        fi
-                    fi
-                }
-                
-                if (( $+functions[p10k-on-pre-prompt] )); then
-                    if [[ "$functions[p10k-on-pre-prompt]" != *"_agent_history_p10k_pre_prompt"* ]]; then
-                        functions[_agent_history_old_p10k_pre_prompt]=$functions[p10k-on-pre-prompt]
-                        p10k-on-pre-prompt() {
-                            if (( $+functions[_agent_history_old_p10k_pre_prompt] )); then
-                                _agent_history_old_p10k_pre_prompt "$@"
-                            fi
-                            if (( $+functions[_agent_history_p10k_pre_prompt] )); then
-                                _agent_history_p10k_pre_prompt "$@"
-                            fi
-                        }
-                    fi
-                else
-                    p10k-on-pre-prompt() {
-                        if (( $+functions[_agent_history_p10k_pre_prompt] )); then
-                            _agent_history_p10k_pre_prompt "$@"
-                        fi
-                    }
-                fi
-                return
-            fi
-            
-            autoload -Uz add-zsh-hook
-            add-zsh-hook -d precmd _agent_history_ssh_init
             local plugin_dir
             plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
             local script_path="$plugin_dir/agent-history"
@@ -80,8 +40,8 @@ if [[ -n "$SSH_CONNECTION" ]]; then
                 "$script_path"
             fi
         }
-        autoload -Uz add-zsh-hook
-        add-zsh-hook precmd _agent_history_ssh_init
+        # Schedule to run at the very first opportunity after shell starts
+        sched +0 _agent_history_ssh_init
     else
         local plugin_dir
         plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
