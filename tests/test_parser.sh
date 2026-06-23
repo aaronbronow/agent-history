@@ -378,6 +378,31 @@ test_history_limit() {
         exit 1
     fi
 
+    # Test -n flag override
+    local out_flag_n
+    out_flag_n=$("$script_bin" -n 3 | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "3" "$out_flag_n" "-n flag count"
+
+    # Test -n flag error cases
+    local err_n
+    if err_n=$("$script_bin" -n abc 2>&1); then
+        echo "FAIL: -n abc should fail but succeeded" >&2
+        exit 1
+    fi
+    if [[ ! "$err_n" == *"requires a positive integer"* ]]; then
+        echo "FAIL: invalid -n error message: '$err_n'" >&2
+        exit 1
+    fi
+
+    # Test -a / --all flag
+    local out_flag_all
+    out_flag_all=$("$script_bin" -a | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "10" "$out_flag_all" "-a flag count"
+
+    local out_flag_all_long
+    out_flag_all_long=$("$script_bin" --all | grep -c -E '^[[:space:]]+[0-9]+\. ')
+    assert_equals "10" "$out_flag_all_long" "--all flag count"
+
     unset AGENT_HISTORY_PATH
     rm -rf "$temp_path"
 }

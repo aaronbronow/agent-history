@@ -379,6 +379,8 @@ Recent agent session viewer and jump to workspace utility.
 Options:
   -h, --help     Show this help message and exit
   -v, --version  Show version and exit
+  -a, --all      Display all matching sessions up to the max limit of 25
+  -n <num>       Display the specified number of sessions (1 to 25)
   --verbose      Print diagnostic information on empty runs
 
 Interactive Quick-Jump:
@@ -421,6 +423,22 @@ main() {
             -v|--version)
                 echo "agent-history 1.0.0"
                 return 0
+                ;;
+            -n)
+                if [[ -n "${2:-}" && "$2" =~ ^[1-9][0-9]*$ ]]; then
+                    limit="$2"
+                    if (( limit > max_limit )); then
+                        limit=$max_limit
+                    fi
+                    shift 2
+                else
+                    echo "Error: -n requires a positive integer argument" >&2
+                    return 1
+                fi
+                ;;
+            -a|--all)
+                limit=$max_limit
+                shift
                 ;;
             --path)
                 if [[ -n "${2:-}" ]]; then
