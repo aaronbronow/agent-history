@@ -22,6 +22,12 @@ REPO_URL="https://github.com/aaronbronow/agent-history.git"
 SHELL_NAME=$(basename "${SHELL:-bash}")
 OMZ_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
+if [[ "$SHELL_NAME" == "zsh" ]] || [ -f "$HOME/.zshrc" ]; then
+    RC_FILE="$HOME/.zshrc"
+else
+    RC_FILE="$HOME/.bashrc"
+fi
+
 if [[ "$SHELL_NAME" == "zsh" ]] && [ -d "$HOME/.oh-my-zsh" ]; then
     echo -e "${CYAN}Oh My Zsh environment detected.${NC}"
     PLUGIN_DIR="$OMZ_DIR/plugins/agent-history"
@@ -42,26 +48,23 @@ else
 fi
 
 if [ "$IS_OMZ" = true ]; then
-    # Check ~/.zshrc for Oh My Zsh plugin activation
-    ZSHRC="$HOME/.zshrc"
-    if [ -f "$ZSHRC" ]; then
-        if grep -q "agent-history" "$ZSHRC"; then
-            echo -e "${GREEN}✓ agent-history is already enabled in your .zshrc!${NC}"
+    # Check plugin activation in RC file
+    if [ -f "$RC_FILE" ]; then
+        if grep -q "agent-history" "$RC_FILE"; then
+            echo -e "${GREEN}✓ agent-history is already enabled in your $RC_FILE!${NC}"
         else
-            echo -e "${YELLOW}! agent-history is not enabled in your .zshrc plugins list.${NC}"
-            echo -e "To enable it, open ${BLUE}~/.zshrc${NC} and add ${CYAN}agent-history${NC} to your plugins list, e.g.:"
+            echo -e "${YELLOW}! agent-history is not enabled in your $RC_FILE plugins list.${NC}"
+            echo -e "To enable it, open ${BLUE}$RC_FILE${NC} and add ${CYAN}agent-history${NC} to your plugins list, e.g.:"
             echo -e "  plugins=(\n    ...\n    ${CYAN}agent-history${NC}\n  )"
         fi
     else
-        echo -e "${RED}Warning: ~/.zshrc file not found. Make sure to load the plugin in your shell configuration.${NC}"
+        echo -e "${RED}Warning: $RC_FILE file not found. Make sure to load the plugin in your shell configuration.${NC}"
     fi
 else
-    # Determine configuration file to update for non-OMZ installations
-    if [[ "$SHELL_NAME" == "zsh" ]] || [ -f "$HOME/.zshrc" ]; then
-        RC_FILE="$HOME/.zshrc"
+    # Determine configuration loader file to update for non-OMZ installations
+    if [[ "$RC_FILE" == *".zshrc" ]]; then
         LOADER_FILE="agent-history.plugin.zsh"
     else
-        RC_FILE="$HOME/.bashrc"
         LOADER_FILE="agent-history.plugin.sh"
     fi
 
