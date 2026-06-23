@@ -33,7 +33,7 @@ function agent-history() {
 if [[ -n "$SSH_CONNECTION" ]]; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         _agent_history_ssh_init() {
-            if [[ -n "${P9K_INSTANT:-}" ]]; then
+            if [[ -n "${P9K_INSTANT:-}" || "${P9K_TTY:-}" == "old" ]]; then
                 return
             fi
             autoload -Uz add-zsh-hook

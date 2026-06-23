@@ -32,7 +32,7 @@ function agent-history() {
 # Helper function to run once at startup after zsh finishes initializing
 _agent_history_ssh_init() {
     # If Powerlevel10k instant prompt is active, defer execution to a later precmd
-    if [[ -n "${P9K_INSTANT:-}" ]]; then
+    if [[ -n "${P9K_INSTANT:-}" || "${P9K_TTY:-}" == "old" ]]; then
         return
     fi
 
