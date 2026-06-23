@@ -74,6 +74,29 @@ The plugin supports environment overrides:
 - `AGENT_HISTORY_PATH`: Colon-separated list of agent dot directories to search for session and chat history (e.g. `~/.antigravitycli:~/.gemini/antigravity-cli:~/.copilot`). If unset, defaults to searching all of them.
 - `AGENT_HISTORY_LIMIT`: Number of recent projects to display in the list (default is `5`, maximum is `25` to maintain sub-200ms prompt loading performance).
 
+### Auto-run on Startup / SSH Login
+
+To automatically display recent workspaces when opening a terminal or logging in via SSH, append the command to your `~/.zshrc`. 
+
+> [!TIP]
+> If you are using **Powerlevel10k with Instant Prompt**, place this block at the very **top** of your `~/.zshrc` (above the instant prompt preamble block) to prevent initialization console warnings.
+
+**Show on SSH login only (Recommended):**
+```zsh
+if [[ -n "$SSH_CONNECTION" ]]; then
+  # Adjust path if installed in a different location
+  local script_path="${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/agent-history/agent-history"
+  [[ -f "$script_path" ]] && "$script_path"
+fi
+```
+
+**Show on every terminal open:**
+```zsh
+# Simply invoke the ah alias/function
+ah
+```
+
+
 ## 🗺️ Porting to Other Shells (Contribute!)
 
 To keep the core engine highly optimized and lightweight, `agent-history` is natively written for **Zsh and generic Bash**. 
