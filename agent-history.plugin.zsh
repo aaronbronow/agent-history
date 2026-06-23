@@ -31,6 +31,11 @@ function agent-history() {
 
 # Helper function to run once at startup after zsh finishes initializing
 _agent_history_ssh_init() {
+    # If Powerlevel10k instant prompt is active, defer execution to a later precmd
+    if [[ -n "${P9K_INSTANT:-}" ]]; then
+        return
+    fi
+
     # Deregister function from precmd hooks so it only runs once
     autoload -Uz add-zsh-hook
     add-zsh-hook -d precmd _agent_history_ssh_init

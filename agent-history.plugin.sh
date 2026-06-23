@@ -31,11 +31,29 @@ function agent-history() {
 
 # Automatically display recent projects upon SSH login
 if [[ -n "$SSH_CONNECTION" ]]; then
-    local plugin_dir
-    plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local script_path="$plugin_dir/agent-history"
-    if [[ -f "$script_path" ]]; then
-        "$script_path"
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        _agent_history_ssh_init() {
+            if [[ -n "${P9K_INSTANT:-}" ]]; then
+                return
+            fi
+            autoload -Uz add-zsh-hook
+            add-zsh-hook -d precmd _agent_history_ssh_init
+            local plugin_dir
+            plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            local script_path="$plugin_dir/agent-history"
+            if [[ -f "$script_path" ]]; then
+                "$script_path"
+            fi
+        }
+        autoload -Uz add-zsh-hook
+        add-zsh-hook precmd _agent_history_ssh_init
+    else
+        local plugin_dir
+        plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        local script_path="$plugin_dir/agent-history"
+        if [[ -f "$script_path" ]]; then
+            "$script_path"
+        fi
     fi
 fi
 
