@@ -50,16 +50,22 @@ if [[ -n "$SSH_CONNECTION" ]]; then
                 }
                 
                 if (( $+functions[p10k-on-pre-prompt] )); then
-                    if (( ! $+functions[_agent_history_old_p10k_pre_prompt] )); then
+                    if [[ "$functions[p10k-on-pre-prompt]" != *"_agent_history_p10k_pre_prompt"* ]]; then
                         functions[_agent_history_old_p10k_pre_prompt]=$functions[p10k-on-pre-prompt]
                         p10k-on-pre-prompt() {
-                            _agent_history_old_p10k_pre_prompt "$@"
-                            _agent_history_p10k_pre_prompt "$@"
+                            if (( $+functions[_agent_history_old_p10k_pre_prompt] )); then
+                                _agent_history_old_p10k_pre_prompt "$@"
+                            fi
+                            if (( $+functions[_agent_history_p10k_pre_prompt] )); then
+                                _agent_history_p10k_pre_prompt "$@"
+                            fi
                         }
                     fi
                 else
                     p10k-on-pre-prompt() {
-                        _agent_history_p10k_pre_prompt "$@"
+                        if (( $+functions[_agent_history_p10k_pre_prompt] )); then
+                            _agent_history_p10k_pre_prompt "$@"
+                        fi
                     }
                 fi
                 return
