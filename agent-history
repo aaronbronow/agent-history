@@ -620,6 +620,11 @@ main() {
     local GRAY="\033[90m"
     local PURPLE="\033[35m"
 
+    local dev_str=""
+    if [[ -h "$HOME/.oh-my-zsh/custom/plugins/agent-history" ]] || [[ "$(dirname "$(readlink -f "$0")")" == *"/dev/agent-history"* ]]; then
+        dev_str=" ${GRAY}[dev]${RESET}"
+    fi
+
     # Calculate padding dynamically based on terminal width to prevent line wrapping on narrow/mobile screens
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 80)
@@ -631,7 +636,7 @@ main() {
         fi
     fi
 
-    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}"
+    echo -e "\n${BOLD}${PURPLE}⚡ Recent Antigravity Projects${RESET}${dev_str}"
 
     for i in "${!valid_workspaces[@]}"; do
         local ws="${valid_workspaces[i]}"
