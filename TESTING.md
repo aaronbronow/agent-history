@@ -57,6 +57,11 @@ Complete these verification steps inside each tested environment:
 
 Record your test results here before tagging a release:
 
+### Version v1.1.0 (2026-06-23)
+* **Status**: Passed unit tests and profiling benchmarks.
+* **Verified by**: @aaronbronow
+* **Notes**: Optimized file lookup (directory exclusions), prioritized associative array preloaded history workspace lookups, and added generic hyphenated project directory resolver support for Claude Code.
+
 ### Version v1.0.0 (2026-06-22)
 * **Status**: Passed unit tests and profiling benchmarks.
 * **Verified by**: @aaronbronow

@@ -288,11 +288,11 @@ test_version_flag() {
     
     local version_out_short
     version_out_short=$("$script_bin" -v)
-    assert_equals "agent-history 1.0.0" "$version_out_short" "-v flag output"
+    assert_equals "agent-history 1.1.0" "$version_out_short" "-v flag output"
     
     local version_out_long
     version_out_long=$("$script_bin" --version)
-    assert_equals "agent-history 1.0.0" "$version_out_long" "--version flag output"
+    assert_equals "agent-history 1.1.0" "$version_out_long" "--version flag output"
 }
 
 test_help_flag() {

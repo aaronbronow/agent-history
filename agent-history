@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pure Bash replacement for antigravity-recent.py
-# Version: 1.0.0
+# Version: 1.1.0
 
 set -eu
 
@@ -179,25 +179,85 @@ shrink_path() {
 find_recent_session_files() {
     local dir="$1"
     # Find files of interest, print mtime and path, sort descending, get the top 50.
-    find -L "$dir" -type f \( \
-        -name "*.jsonl" \
-        -o -name ".project_root" \
-        -o -name "session-store.db" \
-        -o -name ".aider.input.history" \
-        -o -name ".aider.history" \
-        -o -name "*.db" \
-        -o -name "*.sqlite" \
-        -o -name "*.sqlite3" \
-        -o -path "*/conversations/*.pb" \
-        -o -path "*/brain/*/logs/transcript.jsonl" \
-        -o -path "*/brain/*/logs/transcript_full.jsonl" \
-        -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
-    \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 50
+    find -L "$dir" -type f \
+        ! -path "*/.tmp/*" \
+        ! -path "*/plugins/*" \
+        ! -path "*/cache/*" \
+        ! -path "*/backups/*" \
+        ! -path "*/downloads/*" \
+        ! -path "*/node_modules/*" \
+        \( \
+            -name "*.jsonl" \
+            -o -name ".project_root" \
+            -o -name "session-store.db" \
+            -o -name ".aider.input.history" \
+            -o -name ".aider.history" \
+            -o -name "*.db" \
+            -o -name "*.sqlite" \
+            -o -name "*.sqlite3" \
+            -o -path "*/conversations/*.pb" \
+            -o -path "*/brain/*/logs/transcript.jsonl" \
+            -o -path "*/brain/*/logs/transcript_full.jsonl" \
+            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
+        \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 50
 }
 
-# Global capability cache variables
+# Global capability cache and mapping variables
 _HAS_JQ=""
 _HAS_SQLITE3=""
+_HISTORY_WORKSPACES_INITIALIZED="false"
+declare -A _HISTORY_WORKSPACES=()
+
+init_history_workspaces() {
+    if [[ "$_HISTORY_WORKSPACES_INITIALIZED" == "true" ]]; then
+        return 0
+    fi
+    
+    local paths_list=(
+        "$HOME/.antigravitycli"
+        "$HOME/.gemini/antigravity-cli"
+        "$HOME/.gemini/history"
+        "$HOME/.claude"
+        "$HOME/.copilot"
+        "$HOME/.aider"
+        "$HOME/.pi"
+        "$HOME/.droid"
+        "$HOME/.factory"
+        "$HOME/.codex"
+        "$HOME/.openclaw"
+        "$HOME/.hermes"
+        "$HOME/.local/share/opencode"
+        "$HOME/.opencode"
+    )
+    
+    if [[ -n "${AGENT_HISTORY_PATH:-}" ]]; then
+        IFS=':' read -r -a paths_list <<< "$AGENT_HISTORY_PATH"
+    fi
+
+    for raw_path in "${paths_list[@]}"; do
+        local trimmed_path="${raw_path##[[:space:]]}"
+        trimmed_path="${trimmed_path%%[[:space:]]}"
+        if [[ -n "$trimmed_path" ]]; then
+            local path="${trimmed_path/#\~/$HOME}"
+            if [[ -d "$path" && -r "$path" && -x "$path" ]] || [[ -f "$path" && -r "$path" ]]; then
+                if [[ -d "$path" ]]; then
+                    local hist_file="$path/history.jsonl"
+                    if [[ -f "$hist_file" ]]; then
+                        while read -r line; do
+                            if [[ "$line" =~ \"(conversationId|session_id)\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+                                local cid="${BASH_REMATCH[2]}"
+                                if [[ "$line" =~ \"workspace\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+                                    _HISTORY_WORKSPACES["$cid"]="${BASH_REMATCH[1]}"
+                                fi
+                            fi
+                        done < "$hist_file" 2>/dev/null || true
+                    fi
+                fi
+            fi
+        fi
+    done
+    _HISTORY_WORKSPACES_INITIALIZED="true"
+}
 
 # Helper to read workspace path from a session manifest or log file
 get_workspace_from_manifest() {
@@ -217,12 +277,32 @@ get_workspace_from_manifest() {
     local has_sqlite3="$_HAS_SQLITE3"
 
     if [[ "$file" == *.json ]]; then
+        # Optimize: skip parsing non-manifest JSON files early using pure Bash (no process forks)
+        local content=""
+        content=$(< "$file") 2>/dev/null || true
+        if [[ -z "$content" ]]; then
+            return 1
+        fi
+        if [[ "$content" != *"folderUri"* && "$content" != *"workspace"* && "$content" != *"projectRoot"* && "$content" != *"project_root"* && "$content" != *"name"* ]]; then
+            return 1
+        fi
+
+        # Extract workspace using pure Bash regex (zero subprocess forks)
         local ws=""
-        if [[ "$has_jq" == "true" ]]; then
+        if [[ "$content" =~ \"folderUri\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+            ws="${BASH_REMATCH[1]}"
+            ws="${ws#file://}"
+        elif [[ "$content" =~ \"(workspace|projectRoot|project_root|path|name)\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+            ws="${BASH_REMATCH[2]}"
+        fi
+
+        # Fallback to jq only if pure Bash extraction failed but keywords were present
+        if [[ -z "$ws" && "$has_jq" == "true" ]]; then
             ws=$(jq -r '.projectResources.resources[0].folderUri // .name // .path // .workspace // .projectRoot // .project_root // empty' "$file" 2>/dev/null | sed 's|^file://||' || true)
         fi
+        
+        # POSIX fallback parsing of JSON manifest (only if everything else failed)
         if [[ -z "$ws" ]]; then
-            # POSIX fallback parsing of JSON manifest
             ws=$(grep -o -E '"folderUri"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"file:\/\/([^"]+)".*/\1/' || true)
             if [[ -z "$ws" ]]; then
                 ws=$(grep -o -E '"name"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
@@ -231,47 +311,7 @@ get_workspace_from_manifest() {
                 ws=$(grep -o -E '"(path|workspace|projectRoot|project_root)"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
             fi
         fi
-        if [[ -n "$ws" ]]; then
-            echo "$ws"
-            return 0
-        fi
-    elif [[ "$file" == *.jsonl ]]; then
-        # 1. Pi CLI session check: under .pi/agent/sessions/--*--/
-        if [[ "$file" == */.pi/agent/sessions/--*--/*.jsonl ]]; then
-            local dir_name
-            dir_name=$(basename "$(dirname "$file")")
-            local ws
-            ws=$(resolve_encoded_path "$dir_name" || true)
-            if [[ -n "$ws" ]]; then
-                echo "$ws"
-                return 0
-            fi
-        fi
-
-        # 2. General history.jsonl or other JSONL workspace lookup
-        local ws=""
-        if [[ "$has_jq" == "true" ]]; then
-            ws=$(tail -n 1 "$file" | jq -r '.workspace // empty' 2>/dev/null || true)
-        fi
-        if [[ -z "$ws" ]]; then
-            # POSIX fallback parsing of JSONL
-            ws=$(tail -n 1 "$file" 2>/dev/null | grep -o -E '"workspace"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
-        fi
-        if [[ -n "$ws" ]]; then
-            echo "$ws"
-            return 0
-        fi
-    elif [[ "$file" == */.project_root ]]; then
-        local ws
-        read -r ws < "$file" 2>/dev/null || true
-        ws="${ws##[[:space:]]}"
-        ws="${ws%%[[:space:]]}"
-        if [[ -n "$ws" ]]; then
-            echo "$ws"
-            return 0
-        fi
-    elif [[ "$file" == */.aider.input.history || "$file" == */.aider.history ]]; then
-        local ws="${file%/*}"
+        
         if [[ -n "$ws" ]]; then
             echo "$ws"
             return 0
@@ -322,46 +362,105 @@ get_workspace_from_manifest() {
         done
 
         local db_file=""
-        if [[ -n "$conv_dir" && -f "$conv_dir/$uuid.db" ]]; then
-            db_file="$conv_dir/$uuid.db"
+        if [[ -n "$conv_dir" ]]; then
+            if [[ -f "$conv_dir/$uuid.db" ]]; then
+                db_file="$conv_dir/$uuid.db"
+            elif [[ -f "$conv_dir/$uuid.pb" ]]; then
+                db_file="$conv_dir/$uuid.pb"
+            fi
         fi
 
         local ws=""
 
-        # 2. General SQLite direct extraction (Antigravity / Copilot, etc.)
-        if [[ "$has_sqlite3" == "true" && -n "$db_file" ]]; then
-            ws=$(sqlite3 "$db_file" "select data from trajectory_metadata_blob" 2>/dev/null | grep -o 'file://[^[:cntrl:] ]*' | sed 's|^file://||' | head -n 1 || true)
-        fi
+        # 2. Text file lookup (history.jsonl)
+        init_history_workspaces
+        ws="${_HISTORY_WORKSPACES[$uuid]:-}"
 
-        # 3. Text file lookup (history.jsonl)
-        if [[ -z "$ws" && -n "$hist_file" && -f "$hist_file" ]]; then
-            local matched_line
-            matched_line=$(grep "$uuid" "$hist_file" 2>/dev/null | tail -n 1 || true)
-            if [[ -n "$matched_line" ]]; then
-                if [[ "$has_jq" == "true" ]]; then
-                    ws=$(echo "$matched_line" | jq -r '.workspace // empty' 2>/dev/null || true)
-                else
-                    ws=$(echo "$matched_line" | grep -o -E '"workspace"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
-                fi
-            fi
-        fi
-
-        # 4. POSIX binary DB parsing fallback
+        # 3. POSIX binary DB parsing fallback
         if [[ -z "$ws" ]]; then
             local fallback_db=""
             if [[ -f "$file" && ( "$file" == *.db || "$file" == *.sqlite || "$file" == *.sqlite3 ) ]]; then
                 fallback_db="$file"
-            elif [[ -n "$db_file" ]]; then
+            elif [[ -n "$db_file" && ( "$db_file" == *.db || "$db_file" == *.sqlite || "$db_file" == *.sqlite3 ) ]]; then
                 fallback_db="$db_file"
             fi
             if [[ -n "$fallback_db" ]]; then
-                ws=$(grep -o -a -E 'file:///[^[:cntrl:]"'\'' ]*' "$fallback_db" 2>/dev/null | head -n 1 | sed 's|^file://||' | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
-                if [[ -z "$ws" ]]; then
-                    ws=$(grep -o -a -E '/(home|Users)/[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                local base_db
+                base_db=$(basename "$fallback_db")
+                if [[ "$base_db" != memories_* && "$base_db" != goals_* && "$base_db" != logs_* && "$base_db" != state_* ]]; then
+                    # Strictly match using valid path characters [a-zA-Z0-9_./-]+ per workspace rules
+                    ws=$(grep -o -a -E 'file:///[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed 's|^file://||' | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                    if [[ -z "$ws" ]]; then
+                        ws=$(grep -o -a -E '/(home|Users)/[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
+                    fi
                 fi
             fi
         fi
 
+        # 4. SQLite direct extraction as last resort
+        if [[ -z "$ws" && "$has_sqlite3" == "true" && -n "$db_file" ]]; then
+            if [[ "$db_file" == *.db || "$db_file" == *.sqlite || "$db_file" == *.sqlite3 ]]; then
+                ws=$(sqlite3 "$db_file" "select data from trajectory_metadata_blob" 2>/dev/null | grep -o 'file:///[a-zA-Z0-9_./-]+' | sed 's|^file://||' | head -n 1 || true)
+            fi
+        fi
+
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == *.jsonl ]]; then
+        # 1. Encoded path check (e.g. Pi CLI under --*--, Claude projects under -*)
+        local dir_name
+        dir_name=$(basename "$(dirname "$file")")
+        if [[ "$dir_name" == -* ]]; then
+            local ws
+            ws=$(resolve_encoded_path "$dir_name" || true)
+            if [[ -n "$ws" ]]; then
+                echo "$ws"
+                return 0
+            fi
+        fi
+
+        # 2. General history.jsonl or other JSONL workspace lookup
+        # Read the last line using tail (much faster than Bash loop on larger log files)
+        local last_line=""
+        last_line=$(tail -n 1 "$file" 2>/dev/null || true)
+
+        if [[ -z "$last_line" || "$last_line" != *"workspace"* ]]; then
+            return 1
+        fi
+
+        # Extract workspace using pure Bash regex (zero subprocess forks)
+        local ws=""
+        if [[ "$last_line" =~ \"workspace\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+            ws="${BASH_REMATCH[1]}"
+        fi
+
+        if [[ -z "$ws" ]]; then
+            if [[ "$has_jq" == "true" ]]; then
+                ws=$(echo "$last_line" | jq -r '.workspace // empty' 2>/dev/null || true)
+            fi
+            if [[ -z "$ws" ]]; then
+                # POSIX fallback parsing of JSONL
+                ws=$(echo "$last_line" | grep -o -E '"workspace"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+            fi
+        fi
+        
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == */.project_root ]]; then
+        local ws
+        read -r ws < "$file" 2>/dev/null || true
+        ws="${ws##[[:space:]]}"
+        ws="${ws%%[[:space:]]}"
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return 0
+        fi
+    elif [[ "$file" == */.aider.input.history || "$file" == */.aider.history ]]; then
+        local ws="${file%/*}"
         if [[ -n "$ws" ]]; then
             echo "$ws"
             return 0
@@ -421,7 +520,7 @@ main() {
                 return 0
                 ;;
             -v|--version)
-                echo "agent-history 1.0.0"
+                echo "agent-history 1.1.0"
                 return 0
                 ;;
             -n)
@@ -515,6 +614,8 @@ main() {
         existing_paths+=("$path")
     done
 
+
+
     if (( ${#existing_paths[@]} > 0 )); then
         # Run find ONCE for all existing paths combined
         while read -r recent_res; do
@@ -538,20 +639,28 @@ main() {
             done
             
             matched_entries+=("$mtime|$matched_raw|$file_path")
-        done < <(find -L "${existing_paths[@]}" -type f \( \
-            -name "*.jsonl" \
-            -o -name ".project_root" \
-            -o -name "session-store.db" \
-            -o -name ".aider.input.history" \
-            -o -name ".aider.history" \
-            -o -name "*.db" \
-            -o -name "*.sqlite" \
-            -o -name "*.sqlite3" \
-            -o -path "*/conversations/*.pb" \
-            -o -path "*/brain/*/logs/transcript.jsonl" \
-            -o -path "*/brain/*/logs/transcript_full.jsonl" \
-            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
-        \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
+        done < <(find -L "${existing_paths[@]}" -type f \
+            ! -path "*/.tmp/*" \
+            ! -path "*/plugins/*" \
+            ! -path "*/cache/*" \
+            ! -path "*/backups/*" \
+            ! -path "*/downloads/*" \
+            ! -path "*/node_modules/*" \
+            ! -name "rollout-*.jsonl" \
+            \( \
+                -name "*.jsonl" \
+                -o -name ".project_root" \
+                -o -name "session-store.db" \
+                -o -name ".aider.input.history" \
+                -o -name ".aider.history" \
+                -o -name "*.db" \
+                -o -name "*.sqlite" \
+                -o -name "*.sqlite3" \
+                -o -path "*/conversations/*.pb" \
+                -o -path "*/brain/*/logs/transcript.jsonl" \
+                -o -path "*/brain/*/logs/transcript_full.jsonl" \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
+            \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
     fi
 
     if (( ${#matched_entries[@]} == 0 )); then

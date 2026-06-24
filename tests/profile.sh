@@ -49,20 +49,28 @@ profile_runs() {
             if [[ -n "$line" ]]; then
                 matched_files+=("$line")
             fi
-        done < <(find -L "${existing_paths[@]}" -type f \( \
-            -name "*.jsonl" \
-            -o -name ".project_root" \
-            -o -name "session-store.db" \
-            -o -name ".aider.input.history" \
-            -o -name ".aider.history" \
-            -o -name "*.db" \
-            -o -name "*.sqlite" \
-            -o -name "*.sqlite3" \
-            -o -path "*/conversations/*.pb" \
-            -o -path "*/brain/*/logs/transcript.jsonl" \
-            -o -path "*/brain/*/logs/transcript_full.jsonl" \
-            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
-        \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
+        done < <(find -L "${existing_paths[@]}" -type f \
+            ! -path "*/.tmp/*" \
+            ! -path "*/plugins/*" \
+            ! -path "*/cache/*" \
+            ! -path "*/backups/*" \
+            ! -path "*/downloads/*" \
+            ! -path "*/node_modules/*" \
+            ! -name "rollout-*.jsonl" \
+            \( \
+                -name "*.jsonl" \
+                -o -name ".project_root" \
+                -o -name "session-store.db" \
+                -o -name ".aider.input.history" \
+                -o -name ".aider.history" \
+                -o -name "*.db" \
+                -o -name "*.sqlite" \
+                -o -name "*.sqlite3" \
+                -o -path "*/conversations/*.pb" \
+                -o -path "*/brain/*/logs/transcript.jsonl" \
+                -o -path "*/brain/*/logs/transcript_full.jsonl" \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
+            \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
     fi
     local end_find=$(get_time_ns)
     local find_duration=$(( (end_find - start_find) / 1000000 ))
