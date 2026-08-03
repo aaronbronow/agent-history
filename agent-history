@@ -27,6 +27,25 @@ format_relative_time() {
     fi
 }
 
+# Helper to map a path to a clean agent name
+get_agent_name() {
+    local matched_raw="$1"
+    case "$matched_raw" in
+        *".claude"*) echo "Claude" ;;
+        *".aider"*) echo "Aider" ;;
+        *".copilot"*) echo "Copilot" ;;
+        *".gemini"*|*".antigravitycli"*) echo "Gemini" ;;
+        *".pi"*) echo "Pi" ;;
+        *".droid"*) echo "Droid" ;;
+        *".factory"*) echo "Factory" ;;
+        *".codex"*) echo "Codex" ;;
+        *".openclaw"*) echo "OpenClaw" ;;
+        *".hermes"*) echo "Hermes" ;;
+        *"opencode"*) echo "OpenCode" ;;
+        *) echo "Agent" ;;
+    esac
+}
+
 # Helper to get Git branch name without running git commands
 get_git_branch() {
     local path="$1"
@@ -681,6 +700,7 @@ main() {
     local valid_workspaces=()
     local valid_mtimes=()
     local valid_files=()
+    local valid_agents=()
     local count=0
     local -A seen_workspaces
     local has_more="false"
@@ -728,6 +748,7 @@ main() {
         valid_workspaces+=("$ws")
         valid_mtimes+=("$mtime")
         valid_files+=("$manifest_file")
+        valid_agents+=("$agent_path")
         count=$((count + 1))
     done
 
@@ -774,9 +795,15 @@ main() {
     for i in "${!valid_workspaces[@]}"; do
         local ws="${valid_workspaces[i]}"
         local mtime="${valid_mtimes[i]}"
+        local agent_path="${valid_agents[i]}"
+        
+        local agent_name
+        agent_name=$(get_agent_name "$agent_path")
         
         local rel_time
         rel_time=$(format_relative_time "$mtime")
+        
+        local time_str="${agent_name} · ${rel_time}"
         
         local branch
         branch=$(get_git_branch "$ws" || true)
@@ -792,7 +819,7 @@ main() {
         if [[ -n "$branch" ]]; then
             other_len=$(( other_len + ${#branch} + 3 ))
         fi
-        other_len=$(( other_len + ${#rel_time} + 3 ))
+        other_len=$(( other_len + ${#time_str} + 3 ))
         
         local avail_width=$(( term_width - other_len ))
         if (( avail_width < 15 )); then
@@ -804,9 +831,9 @@ main() {
         fi
         
         if (( pad_width > 0 )); then
-            printf "  %d. ${CYAN}%-*s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$pad_width" "$display_path" "$branch_str" "$rel_time"
+            printf "  %d. ${CYAN}%-*s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$pad_width" "$display_path" "$branch_str" "$time_str"
         else
-            printf "  %d. ${CYAN}%s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$rel_time"
+            printf "  %d. ${CYAN}%s${RESET}%b ${GRAY}(%s)${RESET}\n" "$((i + 1))" "$display_path" "$branch_str" "$time_str"
         fi
     done
 
