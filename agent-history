@@ -802,10 +802,10 @@ main() {
     for i in "${!valid_workspaces[@]}"; do
         local ws="${valid_workspaces[i]}"
         local mtime="${valid_mtimes[i]}"
-        local agent_path="${valid_agents[i]}"
+        local manifest_file="${valid_files[i]}"
         
         local agent_name
-        agent_name=$(get_agent_name "$agent_path")
+        agent_name=$(get_agent_name "$manifest_file")
         
         local rel_time
         rel_time=$(format_relative_time "$mtime")
