@@ -2,7 +2,7 @@
 
 The fastest shell shortcut to resume your recent AI coding sessions before your terminal cools down.
 
-It reads execution logs and session databases from AI coding assistants (such as Antigravity, Claude Code, Copilot, Aider, and Pi), filters out deleted folders and home directory roots, and displays a beautiful status dashboard of your most recent sessions.
+It reads execution logs and session databases from AI coding assistants (such as Claude Code, GitHub Copilot, Aider, Gemini / Antigravity, Pi, Droid, Factory, Codex, OpenClaw, Hermes, and OpenCode), filters out deleted folders and home directory roots, and displays a beautiful status dashboard of your most recent sessions.
 
 ![agent-history Demo](demos/ah%201.gif)
 
