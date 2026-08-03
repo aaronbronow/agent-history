@@ -779,14 +779,21 @@ main() {
         dev_str=" ${GRAY}[dev]${RESET}"
     fi
 
-    # Calculate padding dynamically based on terminal width to prevent line wrapping on narrow/mobile screens
+    # Calculate padding dynamically based on terminal width and path lengths to prevent wrapping
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 80)
-    local pad_width=40
-    if (( term_width < 80 )); then
-        pad_width=$(( term_width - 30 ))
-        if (( pad_width < 0 )); then
-            pad_width=0
+    local pad_width=0
+    if (( term_width >= 80 )); then
+        local max_len=0
+        for ws in "${valid_workspaces[@]}"; do
+            local display_path="${ws/#$HOME/\~}"
+            if (( ${#display_path} > max_len )); then
+                max_len=${#display_path}
+            fi
+        done
+        pad_width=$max_len
+        if (( pad_width > 40 )); then
+            pad_width=40
         fi
     fi
 
