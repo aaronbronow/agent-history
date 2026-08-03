@@ -4,6 +4,8 @@ The fastest shell shortcut to resume your recent AI coding sessions before your 
 
 It reads execution logs and session databases from AI coding assistants (such as Antigravity, Claude Code, Copilot, Aider, and Pi), filters out deleted folders and home directory roots, and displays a beautiful status dashboard of your most recent sessions.
 
+![agent-history Demo](demos/ah%201.gif)
+
 ## Features
 
 - **Relative Recency Timestamps**: Shows when a project was last edited (e.g. `23h ago`, `2d ago`).
@@ -53,11 +55,11 @@ ah
 Output:
 ```
 ⚡ Recent Agent Sessions
-  1. ~/dev/chat-bot                           (main) (2m ago)
-  2. ~/projects/next-auth                     (oauth-fix) (1h ago)
-  3. ~/src/web-scraper                        (main) (3h ago)
-  4. ~/work/pricing-api                       (feature-rules) (1d ago)
-  5. ~/personal/dotfiles                      (main) (3d ago)
+  1. ~/dev/chat-bot                           (main) (Claude · 2m ago)
+  2. ~/projects/next-auth                     (oauth-fix) (Aider · 1h ago)
+  3. ~/src/web-scraper                        (main) (Gemini · 3h ago)
+  4. ~/work/pricing-api                       (feature-rules) (Copilot · 1d ago)
+  5. ~/personal/dotfiles                      (main) (Claude · 3d ago)
 
 💡 Run ah <num> to jump to a project folder. (showing 5 most recent)
 ```
@@ -67,6 +69,13 @@ To switch your shell's current working directory directly to one of the listed p
 ```bash
 ah 2
 ```
+
+### Command Options
+You can configure or adjust the active session limits dynamically using flags:
+* `ah -a` or `ah --all`: Display all matching workspace sessions up to the performance cap of 25.
+* `ah -n <num>`: Display exactly the specified `<num>` of sessions (1 to 25).
+* `ah -h` or `ah --help`: Display the usage guidelines and help panel.
+* `ah -v` or `ah --version`: Display the version.
 
 ## Configuration
 
