@@ -52,7 +52,7 @@ ah
 ```
 Output:
 ```
-⚡ Recent Antigravity Projects
+⚡ Recent Agent Sessions
   1. ~/dev/chat-bot                           (main) (2m ago)
   2. ~/projects/next-auth                     (oauth-fix) (1h ago)
   3. ~/src/web-scraper                        (main) (3h ago)
