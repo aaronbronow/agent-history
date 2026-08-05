@@ -56,6 +56,7 @@ profile_runs() {
             ! -path "*/backups/*" \
             ! -path "*/downloads/*" \
             ! -path "*/node_modules/*" \
+            ! -path "*/.system_generated/*" \
             ! -name "rollout-*.jsonl" \
             \( \
                 -name "*.jsonl" \
@@ -67,9 +68,7 @@ profile_runs() {
                 -o -name "*.sqlite" \
                 -o -name "*.sqlite3" \
                 -o -path "*/conversations/*.pb" \
-                -o -path "*/brain/*/logs/transcript.jsonl" \
-                -o -path "*/brain/*/logs/transcript_full.jsonl" \
-                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
             \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
     fi
     local end_find=$(get_time_ns)
@@ -77,6 +76,7 @@ profile_runs() {
     echo "1. Consolidated find + sort + head: ${find_duration}ms (found ${#matched_files[@]} files)"
 
     # 2. Profile workspace resolution
+    init_history_workspaces
     local start_parse=$(get_time_ns)
     local resolved_workspaces=()
     local parsed_count=0

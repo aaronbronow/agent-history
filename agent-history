@@ -315,21 +315,7 @@ get_workspace_from_manifest() {
             ws="${BASH_REMATCH[2]}"
         fi
 
-        # Fallback to jq only if pure Bash extraction failed but keywords were present
-        if [[ -z "$ws" && "$has_jq" == "true" ]]; then
-            ws=$(jq -r '.projectResources.resources[0].folderUri // .name // .path // .workspace // .projectRoot // .project_root // empty' "$file" 2>/dev/null | sed 's|^file://||' || true)
-        fi
-        
-        # POSIX fallback parsing of JSON manifest (only if everything else failed)
-        if [[ -z "$ws" ]]; then
-            ws=$(grep -o -E '"folderUri"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"file:\/\/([^"]+)".*/\1/' || true)
-            if [[ -z "$ws" ]]; then
-                ws=$(grep -o -E '"name"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
-            fi
-            if [[ -z "$ws" ]]; then
-                ws=$(grep -o -E '"(path|workspace|projectRoot|project_root)"[[:space:]]*:[[:space:]]*"[^"]+"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
-            fi
-        fi
+
         
         if [[ -n "$ws" ]]; then
             echo "$ws"
@@ -356,18 +342,32 @@ get_workspace_from_manifest() {
             fi
         fi
 
-        local uuid
-        uuid=$(basename "$file" | sed -E 's/\.(db|pb|jsonl|sqlite|sqlite3)$//' || true)
+        # Extract UUID purely in Bash (zero subprocess forks)
+        local filename="${file##*/}"
+        local uuid="${filename%.*}"
         if [[ "$uuid" == "transcript" || "$uuid" == "transcript_full" ]]; then
-            uuid=$(basename "$(dirname "$(dirname "$(dirname "$file")")")" || true)
+            local temp="${file%/.system_generated/logs/*}"
+            uuid="${temp##*/}"
         fi
 
+        # 2. Fast UUID lookup mapping (history.jsonl)
+        if [[ "$uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            init_history_workspaces
+            local ws="${_HISTORY_WORKSPACES[$uuid]:-}"
+            if [[ -n "$ws" ]]; then
+                echo "$ws"
+                return 0
+            else
+                return 1
+            fi
+        fi
+
+        # 3. Fallback for other databases (non-UUID format, e.g. custom stores)
         # Climb up to find conversations/ directory and history.jsonl
-        local parent_dir
-        parent_dir=$(dirname "$file")
+        local parent_dir="${file%/*}"
         local conv_dir=""
         local hist_file=""
-        while [[ "$parent_dir" != "/" ]]; do
+        while [[ -n "$parent_dir" && "$parent_dir" != "/" ]]; do
             if [[ -d "$parent_dir/conversations" && -z "$conv_dir" ]]; then
                 conv_dir="$parent_dir/conversations"
             fi
@@ -377,7 +377,7 @@ get_workspace_from_manifest() {
             if [[ -n "$conv_dir" && -n "$hist_file" ]]; then
                 break
             fi
-            parent_dir=$(dirname "$parent_dir")
+            parent_dir="${parent_dir%/*}"
         done
 
         local db_file=""
@@ -391,11 +391,7 @@ get_workspace_from_manifest() {
 
         local ws=""
 
-        # 2. Text file lookup (history.jsonl)
-        init_history_workspaces
-        ws="${_HISTORY_WORKSPACES[$uuid]:-}"
-
-        # 3. POSIX binary DB parsing fallback
+        # 4. POSIX binary DB parsing fallback
         if [[ -z "$ws" ]]; then
             local fallback_db=""
             if [[ -f "$file" && ( "$file" == *.db || "$file" == *.sqlite || "$file" == *.sqlite3 ) ]]; then
@@ -404,8 +400,7 @@ get_workspace_from_manifest() {
                 fallback_db="$db_file"
             fi
             if [[ -n "$fallback_db" ]]; then
-                local base_db
-                base_db=$(basename "$fallback_db")
+                local base_db="${fallback_db##*/}"
                 if [[ "$base_db" != memories_* && "$base_db" != goals_* && "$base_db" != logs_* && "$base_db" != state_* ]]; then
                     # Strictly match using valid path characters [a-zA-Z0-9_./-]+ per workspace rules
                     ws=$(grep -o -a -E 'file:///[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed 's|^file://||' | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
@@ -416,7 +411,7 @@ get_workspace_from_manifest() {
             fi
         fi
 
-        # 4. SQLite direct extraction as last resort
+        # 5. SQLite direct extraction as last resort
         if [[ -z "$ws" && "$has_sqlite3" == "true" && -n "$db_file" ]]; then
             if [[ "$db_file" == *.db || "$db_file" == *.sqlite || "$db_file" == *.sqlite3 ]]; then
                 ws=$(sqlite3 "$db_file" "select data from trajectory_metadata_blob" 2>/dev/null | grep -o 'file:///[a-zA-Z0-9_./-]+' | sed 's|^file://||' | head -n 1 || true)
@@ -429,8 +424,8 @@ get_workspace_from_manifest() {
         fi
     elif [[ "$file" == *.jsonl ]]; then
         # 1. Encoded path check (e.g. Pi CLI under --*--, Claude projects under -*)
-        local dir_name
-        dir_name=$(basename "$(dirname "$file")")
+        local parent_dir="${file%/*}"
+        local dir_name="${parent_dir##*/}"
         if [[ "$dir_name" == -* ]]; then
             local ws
             ws=$(resolve_encoded_path "$dir_name" || true)
@@ -596,6 +591,8 @@ main() {
             "$HOME/.opencode"
         )
     fi
+    # Pre-initialize history workspaces in parent shell to avoid subshell parsing overhead
+    init_history_workspaces
 
     local paths_checked=()
     local matched_entries=()
@@ -665,6 +662,7 @@ main() {
             ! -path "*/backups/*" \
             ! -path "*/downloads/*" \
             ! -path "*/node_modules/*" \
+            ! -path "*/.system_generated/*" \
             ! -name "rollout-*.jsonl" \
             \( \
                 -name "*.jsonl" \
@@ -676,9 +674,7 @@ main() {
                 -o -name "*.sqlite" \
                 -o -name "*.sqlite3" \
                 -o -path "*/conversations/*.pb" \
-                -o -path "*/brain/*/logs/transcript.jsonl" \
-                -o -path "*/brain/*/logs/transcript_full.jsonl" \
-                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" ! -path "*/.system_generated/*" \) \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
             \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
     fi
 
@@ -733,8 +729,7 @@ main() {
         fi
 
         # Exclude hidden directories under home directory
-        local base_ws
-        base_ws=$(basename "$ws")
+        local base_ws="${ws##*/}"
         if [[ "$base_ws" == .* ]]; then
             continue
         fi
