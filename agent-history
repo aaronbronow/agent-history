@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pure Bash replacement for antigravity-recent.py
-# Version: 1.2.1
+# Version: 1.2.2
 
 set -eu
 
@@ -534,7 +534,7 @@ main() {
                 return 0
                 ;;
             -v|--version)
-                echo "agent-history 1.2.1"
+                echo "agent-history 1.2.2"
                 return 0
                 ;;
             -n)
@@ -643,6 +643,21 @@ main() {
             local timestamp="${recent_res%% *}"
             local mtime="${timestamp%%.*}"
             local file_path="${recent_res#* }"
+            
+            # Override mtime for opencode.db with actual session time_updated to avoid global DB mtime skew
+            if [[ "$file_path" == *opencode.db ]]; then
+                if hash sqlite3 2>/dev/null; then
+                    local db_time
+                    db_time=$(sqlite3 "$file_path" "select time_updated from session order by time_updated desc limit 1" 2>/dev/null || true)
+                    if [[ -n "$db_time" ]]; then
+                        if (( ${#db_time} == 13 )); then
+                            mtime=$((db_time / 1000))
+                        else
+                            mtime="$db_time"
+                        fi
+                    fi
+                fi
+            fi
             
             # Identify which raw path this file belongs to (for verbose/tracking)
             local matched_raw=""

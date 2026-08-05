@@ -1,6 +1,6 @@
 # Oh My Zsh Plugin: agent-history
 # Exposes utilities to track and switch to recent Antigravity workspaces.
-# Version: 1.2.1
+# Version: 1.2.2
 
 # Get the directory of the current script (works during sourcing)
 _AGENT_HISTORY_DIR="${${(%):-%x}:A:h}"
