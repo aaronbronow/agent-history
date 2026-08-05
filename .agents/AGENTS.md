@@ -31,3 +31,9 @@ These rules and learnings should guide future updates and maintenance tasks in t
 - Utilize pure-Bash regex pattern matching (`=~` and `${BASH_REMATCH}`) to parse keys and values out of JSON/JSONL strings instead of calling `jq` or `sed`.
 - Ensure consolidated `find` queries exclude temporary, cache, backup, and plugin directories (e.g., `! -path "*/.tmp/*"`, `! -path "*/plugins/*"`, `! -path "*/cache/*"`, `! -path "*/backups/*"`, `! -name "rollout-*.jsonl"`) to keep file matching lists clean and prevent config files from flooding results.
 
+## 6. Version Release & Bump Management
+- Whenever releasing a new version or creating a tag, ensure the version string (e.g. `1.2.1`) is updated in the following 4 files:
+  1. `agent-history` (the version comment `# Version: X.Y.Z` at the top and the `-v|--version` flag output block inside `main()`).
+  2. `agent-history.plugin.zsh` (the version comment `# Version: X.Y.Z` at the top).
+  3. `agent-history.plugin.sh` (the version comment `# Version: X.Y.Z` at the top).
+  4. `tests/test_parser.sh` (the assertion checks inside `test_version_flag()`).
