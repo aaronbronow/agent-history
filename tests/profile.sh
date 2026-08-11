@@ -49,27 +49,7 @@ profile_runs() {
             if [[ -n "$line" ]]; then
                 matched_files+=("$line")
             fi
-        done < <(find -L "${existing_paths[@]}" -type f \
-            ! -path "*/.tmp/*" \
-            ! -path "*/plugins/*" \
-            ! -path "*/cache/*" \
-            ! -path "*/backups/*" \
-            ! -path "*/downloads/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/.system_generated/*" \
-            ! -name "rollout-*.jsonl" \
-            \( \
-                -name "*.jsonl" \
-                -o -name ".project_root" \
-                -o -name "session-store.db" \
-                -o -name ".aider.input.history" \
-                -o -name ".aider.history" \
-                -o -name "*.db" \
-                -o -name "*.sqlite" \
-                -o -name "*.sqlite3" \
-                -o -path "*/conversations/*.pb" \
-                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
-            \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
+        done < <(run_find_matching_files "${existing_paths[@]}" | sort -rn | head -n 100 || true)
     fi
     local end_find=$(get_time_ns)
     local find_duration=$(( (end_find - start_find) / 1000000 ))
@@ -82,8 +62,8 @@ profile_runs() {
     local parsed_count=0
     for entry in "${matched_files[@]}"; do
         local file_path="${entry#* }"
-        local ws
-        ws=$(get_workspace_from_manifest "$file_path" || true)
+        _resolve_workspace_from_manifest "$file_path" || true
+        local ws="$_RESOLVED_WS"
         if [[ -n "$ws" ]]; then
             resolved_workspaces+=("$ws")
         fi
@@ -91,15 +71,15 @@ profile_runs() {
     done
     local end_parse=$(get_time_ns)
     local parse_duration=$(( (end_parse - start_parse) / 1000000 ))
-    echo "2. get_workspace_from_manifest (Total parsing ${parsed_count} files): ${parse_duration}ms"
+    echo "2. _resolve_workspace_from_manifest (Total parsing ${parsed_count} files): ${parse_duration}ms"
 
     # 3. Profile git branch checks
     local start_git=$(get_time_ns)
     local git_checked=0
     for ws in "${resolved_workspaces[@]}"; do
         if [[ -d "$ws" ]]; then
-            local branch
-            branch=$(get_git_branch "$ws" || true)
+            _resolve_git_branch "$ws" || true
+            local branch="$_RESOLVED_GIT_BRANCH"
             git_checked=$((git_checked + 1))
         fi
     done

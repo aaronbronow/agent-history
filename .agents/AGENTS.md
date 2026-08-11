@@ -27,8 +27,9 @@ These rules and learnings should guide future updates and maintenance tasks in t
 
 ## 5. Subprocess Avoidance & In-Memory Preloading
 - To achieve optimal shell startup performance, avoid executing any external commands/forks (like `jq`, `tail`, `grep`, `sed`, `sqlite3`) inside loops.
-- Preload configuration and manifest files (such as `history.jsonl`) into a global Bash associative array (`declare -A`) on demand or at startup using pure-Bash `while read` constructs. This converts loop database lookups into in-memory microsecond operations with zero process forks.
-- Utilize pure-Bash regex pattern matching (`=~` and `${BASH_REMATCH}`) to parse keys and values out of JSON/JSONL strings instead of calling `jq` or `sed`.
+- Preload configuration and manifest files (such as `history.jsonl`) into global Bash dynamic variables (`_HISTORY_WS_<key>`) on demand or at startup using pure-Bash `while read` constructs, `printf -v`, and indirect expansion (`${!var}`). Avoid `declare -A` (associative arrays) to maintain compatibility with default macOS Bash 3.2. This converts loop database lookups into in-memory microsecond operations with zero process forks.
+- Avoid command substitution (`$()`) inside loops. Use in-process resolver functions (`_resolve_*`) that assign to global variables (`_RESOLVED_*`) to eliminate subshell process fork overhead.
+- For home directory path display, use `${ws/#$HOME/~}` (un-escaped tilde) to avoid literal backslashes in display paths.
 - Ensure consolidated `find` queries exclude temporary, cache, backup, and plugin directories (e.g., `! -path "*/.tmp/*"`, `! -path "*/plugins/*"`, `! -path "*/cache/*"`, `! -path "*/backups/*"`, `! -name "rollout-*.jsonl"`) to keep file matching lists clean and prevent config files from flooding results.
 
 ## 6. Version Release & Bump Management

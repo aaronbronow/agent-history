@@ -1,6 +1,6 @@
 # Generic Bash/Zsh loader for agent-history
 # Exposes utilities to track and switch to recent workspaces.
-# Version: 1.2.2
+# Version: 1.2.3
 
 function agent-history() {
     # Resolve the plugin's absolute directory to locate the script

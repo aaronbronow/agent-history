@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Pure Bash replacement for antigravity-recent.py
-# Version: 1.2.2
+# Version: 1.2.3
 
 set -eu
 
-# Helper to format relative time
-format_relative_time() {
-    local mtime="$1"
+_RESOLVED_REL_TIME=""
+_resolve_relative_time() {
+    local raw_mtime="$1"
+    local mtime="${raw_mtime%.*}"
     local current_time
     if [[ -n "${ANTIGRAVITY_MOCK_TIME:-}" ]]; then
         current_time="${ANTIGRAVITY_MOCK_TIME}"
@@ -15,40 +16,51 @@ format_relative_time() {
     fi
     local sec_diff=$((current_time - mtime))
     if (( sec_diff < 0 )); then
-        echo "just now"
+        _RESOLVED_REL_TIME="just now"
     elif (( sec_diff < 60 )); then
-        echo "${sec_diff}s ago"
+        _RESOLVED_REL_TIME="${sec_diff}s ago"
     elif (( sec_diff < 3600 )); then
-        echo "$((sec_diff / 60))m ago"
+        _RESOLVED_REL_TIME="$((sec_diff / 60))m ago"
     elif (( sec_diff < 86400 )); then
-        echo "$((sec_diff / 3600))h ago"
+        _RESOLVED_REL_TIME="$((sec_diff / 3600))h ago"
     else
-        echo "$((sec_diff / 86400))d ago"
+        _RESOLVED_REL_TIME="$((sec_diff / 86400))d ago"
     fi
 }
 
-# Helper to map a path to a clean agent name
-get_agent_name() {
+format_relative_time() {
+    _resolve_relative_time "$1"
+    echo "$_RESOLVED_REL_TIME"
+}
+
+_RESOLVED_AGENT_NAME=""
+_resolve_agent_name() {
     local matched_raw="$1"
     case "$matched_raw" in
-        *".claude"*) echo "Claude" ;;
-        *".aider"*) echo "Aider" ;;
-        *".copilot"*) echo "Copilot" ;;
-        *".gemini"*|*".antigravitycli"*) echo "Gemini" ;;
-        *".pi"*) echo "Pi" ;;
-        *".droid"*) echo "Droid" ;;
-        *".factory"*) echo "Factory" ;;
-        *".codex"*) echo "Codex" ;;
-        *".openclaw"*) echo "OpenClaw" ;;
-        *".hermes"*) echo "Hermes" ;;
-        *"opencode"*) echo "OpenCode" ;;
-        *) echo "Agent" ;;
+        *".claude"*) _RESOLVED_AGENT_NAME="Claude" ;;
+        *".aider"*) _RESOLVED_AGENT_NAME="Aider" ;;
+        *".copilot"*) _RESOLVED_AGENT_NAME="Copilot" ;;
+        *".gemini"*|*".antigravitycli"*) _RESOLVED_AGENT_NAME="Gemini" ;;
+        *".pi"*) _RESOLVED_AGENT_NAME="Pi" ;;
+        *".droid"*) _RESOLVED_AGENT_NAME="Droid" ;;
+        *".factory"*) _RESOLVED_AGENT_NAME="Factory" ;;
+        *".codex"*) _RESOLVED_AGENT_NAME="Codex" ;;
+        *".openclaw"*) _RESOLVED_AGENT_NAME="OpenClaw" ;;
+        *".hermes"*) _RESOLVED_AGENT_NAME="Hermes" ;;
+        *"opencode"*) _RESOLVED_AGENT_NAME="OpenCode" ;;
+        *) _RESOLVED_AGENT_NAME="Agent" ;;
     esac
 }
 
-# Helper to get Git branch name without running git commands
-get_git_branch() {
+get_agent_name() {
+    _resolve_agent_name "$1"
+    echo "$_RESOLVED_AGENT_NAME"
+}
+
+_RESOLVED_GIT_BRANCH=""
+_resolve_git_branch() {
     local path="$1"
+    _RESOLVED_GIT_BRANCH=""
     local git_path="$path/.git"
     if [[ ! -e "$git_path" ]]; then
         return 1
@@ -58,7 +70,6 @@ get_git_branch() {
         content=$(< "$git_path") 2>/dev/null || true
         if [[ "$content" == "gitdir: "* ]]; then
             local gitdir="${content#gitdir: }"
-            # Trim whitespace using Bash builtins
             gitdir="${gitdir##[[:space:]]}"
             gitdir="${gitdir%%[[:space:]]}"
             if [[ "$gitdir" != /* ]]; then
@@ -81,22 +92,31 @@ get_git_branch() {
     local head_content
     head_content=$(< "$head_file") 2>/dev/null || true
     if [[ "$head_content" == "ref: refs/heads/"* ]]; then
-        echo "${head_content#ref: refs/heads/}"
+        local ref="${head_content#ref: refs/heads/}"
+        _RESOLVED_GIT_BRANCH="${ref%%[[:space:]]}"
         return 0
     elif [[ "$head_content" == "ref: "* ]]; then
-        echo "${head_content#ref: }"
+        local ref="${head_content#ref: }"
+        _RESOLVED_GIT_BRANCH="${ref%%[[:space:]]}"
         return 0
     elif [[ -n "$head_content" ]]; then
-        # Detached HEAD, return first 7 characters
-        # Get first line and trim whitespace using Bash builtins
         local first_line
         read -r first_line <<< "$head_content" || true
         first_line="${first_line##[[:space:]]}"
         first_line="${first_line%%[[:space:]]}"
-        echo "${first_line:0:7}"
+        _RESOLVED_GIT_BRANCH="${first_line:0:7}"
         return 0
     fi
     return 1
+}
+
+get_git_branch() {
+    if _resolve_git_branch "$1"; then
+        echo "$_RESOLVED_GIT_BRANCH"
+        return 0
+    else
+        return 1
+    fi
 }
 
 # Recursive helper to backtrack and find valid directories matching hyphenated paths
@@ -194,38 +214,100 @@ shrink_path() {
 }
 
 
+_FIND_PRINTF_MODE=""
+
+run_find_matching_files() {
+    if [[ -z "$_FIND_PRINTF_MODE" ]]; then
+        if find . -maxdepth 0 -printf "%T@ %p\n" 2>/dev/null | grep -q "^[0-9]"; then
+            _FIND_PRINTF_MODE="printf"
+        elif stat -f "%m %N" . 2>/dev/null | grep -q "^[0-9]"; then
+            _FIND_PRINTF_MODE="bsd_stat"
+        elif stat -c "%Y %n" . 2>/dev/null | grep -q "^[0-9]"; then
+            _FIND_PRINTF_MODE="gnu_stat"
+        else
+            _FIND_PRINTF_MODE="none"
+        fi
+    fi
+
+    if [[ "$_FIND_PRINTF_MODE" == "printf" ]]; then
+        find -L "$@" -type f \
+            ! -path "*/.tmp/*" \
+            ! -path "*/plugins/*" \
+            ! -path "*/cache/*" \
+            ! -path "*/backups/*" \
+            ! -path "*/downloads/*" \
+            ! -path "*/node_modules/*" \
+            ! -path "*/.system_generated/*" \
+            ! -name "rollout-*.jsonl" \
+            \( \
+                -name "*.jsonl" \
+                -o -name ".project_root" \
+                -o -name "session-store.db" \
+                -o -name ".aider.input.history" \
+                -o -name ".aider.history" \
+                -o -name "*.db" \
+                -o -name "*.sqlite" \
+                -o -name "*.sqlite3" \
+                -o -path "*/conversations/*.pb" \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
+            \) -printf '%T@ %p\n' 2>/dev/null
+    elif [[ "$_FIND_PRINTF_MODE" == "bsd_stat" ]]; then
+        find -L "$@" -type f \
+            ! -path "*/.tmp/*" \
+            ! -path "*/plugins/*" \
+            ! -path "*/cache/*" \
+            ! -path "*/backups/*" \
+            ! -path "*/downloads/*" \
+            ! -path "*/node_modules/*" \
+            ! -path "*/.system_generated/*" \
+            ! -name "rollout-*.jsonl" \
+            \( \
+                -name "*.jsonl" \
+                -o -name ".project_root" \
+                -o -name "session-store.db" \
+                -o -name ".aider.input.history" \
+                -o -name ".aider.history" \
+                -o -name "*.db" \
+                -o -name "*.sqlite" \
+                -o -name "*.sqlite3" \
+                -o -path "*/conversations/*.pb" \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
+            \) -exec stat -f '%m %N' {} + 2>/dev/null
+    elif [[ "$_FIND_PRINTF_MODE" == "gnu_stat" ]]; then
+        find -L "$@" -type f \
+            ! -path "*/.tmp/*" \
+            ! -path "*/plugins/*" \
+            ! -path "*/cache/*" \
+            ! -path "*/backups/*" \
+            ! -path "*/downloads/*" \
+            ! -path "*/node_modules/*" \
+            ! -path "*/.system_generated/*" \
+            ! -name "rollout-*.jsonl" \
+            \( \
+                -name "*.jsonl" \
+                -o -name ".project_root" \
+                -o -name "session-store.db" \
+                -o -name ".aider.input.history" \
+                -o -name ".aider.history" \
+                -o -name "*.db" \
+                -o -name "*.sqlite" \
+                -o -name "*.sqlite3" \
+                -o -path "*/conversations/*.pb" \
+                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
+            \) -exec stat -c '%Y %n' {} + 2>/dev/null
+    fi
+}
+
 # Helper to find recent session/log files in a directory
 find_recent_session_files() {
     local dir="$1"
-    # Find files of interest, print mtime and path, sort descending, get the top 50.
-    find -L "$dir" -type f \
-        ! -path "*/.tmp/*" \
-        ! -path "*/plugins/*" \
-        ! -path "*/cache/*" \
-        ! -path "*/backups/*" \
-        ! -path "*/downloads/*" \
-        ! -path "*/node_modules/*" \
-        \( \
-            -name "*.jsonl" \
-            -o -name ".project_root" \
-            -o -name "session-store.db" \
-            -o -name ".aider.input.history" \
-            -o -name ".aider.history" \
-            -o -name "*.db" \
-            -o -name "*.sqlite" \
-            -o -name "*.sqlite3" \
-            -o -path "*/conversations/*.pb" \
-            -o -path "*/brain/*/logs/transcript.jsonl" \
-            -o -path "*/brain/*/logs/transcript_full.jsonl" \
-            -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" \) \
-        \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 50
+    run_find_matching_files "$dir" | sort -rn | head -n 50
 }
 
 # Global capability cache and mapping variables
 _HAS_JQ=""
 _HAS_SQLITE3=""
 _HISTORY_WORKSPACES_INITIALIZED="false"
-declare -A _HISTORY_WORKSPACES=()
 
 init_history_workspaces() {
     if [[ "$_HISTORY_WORKSPACES_INITIALIZED" == "true" ]]; then
@@ -266,7 +348,8 @@ init_history_workspaces() {
                             if [[ "$line" =~ \"(conversationId|session_id)\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
                                 local cid="${BASH_REMATCH[2]}"
                                 if [[ "$line" =~ \"workspace\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-                                    _HISTORY_WORKSPACES["$cid"]="${BASH_REMATCH[1]}"
+                                    local var_key="${cid//-/_}"
+                                    printf -v "_HISTORY_WS_${var_key}" '%s' "${BASH_REMATCH[1]}"
                                 fi
                             fi
                         done < "$hist_file" 2>/dev/null || true
@@ -278,9 +361,10 @@ init_history_workspaces() {
     _HISTORY_WORKSPACES_INITIALIZED="true"
 }
 
-# Helper to read workspace path from a session manifest or log file
-get_workspace_from_manifest() {
+#_RESOLVED_WS=""
+_resolve_workspace_from_manifest() {
     local file="$1"
+    _RESOLVED_WS=""
     if [[ ! -f "$file" ]]; then
         return 1
     fi
@@ -318,7 +402,7 @@ get_workspace_from_manifest() {
 
         
         if [[ -n "$ws" ]]; then
-            echo "$ws"
+            _RESOLVED_WS="$ws"
             return 0
         fi
     elif [[ "$file" == *.db || "$file" == *.sqlite || "$file" == *.sqlite3 || "$file" == *.pb || "$file" == *transcript.jsonl || "$file" == *transcript_full.jsonl ]]; then
@@ -328,7 +412,7 @@ get_workspace_from_manifest() {
                 local ws
                 ws=$(sqlite3 "$file" "select directory from session order by time_updated desc limit 1" 2>/dev/null || true)
                 if [[ -n "$ws" ]]; then
-                    echo "$ws"
+                    _RESOLVED_WS="$ws"
                     return 0
                 fi
             else
@@ -336,7 +420,7 @@ get_workspace_from_manifest() {
                 local ws
                 ws=$(grep -o -a -E '/(home|Users)/[a-zA-Z0-9_./-]+' "$file" 2>/dev/null | head -n 1 | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
                 if [[ -n "$ws" ]]; then
-                    echo "$ws"
+                    _RESOLVED_WS="$ws"
                     return 0
                 fi
             fi
@@ -353,9 +437,11 @@ get_workspace_from_manifest() {
         # 2. Fast UUID lookup mapping (history.jsonl)
         if [[ "$uuid" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
             init_history_workspaces
-            local ws="${_HISTORY_WORKSPACES[$uuid]:-}"
+            local var_key="${uuid//-/_}"
+            local var_name="_HISTORY_WS_${var_key}"
+            local ws="${!var_name:-}"
             if [[ -n "$ws" ]]; then
-                echo "$ws"
+                _RESOLVED_WS="$ws"
                 return 0
             else
                 return 1
@@ -419,7 +505,7 @@ get_workspace_from_manifest() {
         fi
 
         if [[ -n "$ws" ]]; then
-            echo "$ws"
+            _RESOLVED_WS="$ws"
             return 0
         fi
     elif [[ "$file" == *.jsonl ]]; then
@@ -430,7 +516,7 @@ get_workspace_from_manifest() {
             local ws
             ws=$(resolve_encoded_path "$dir_name" || true)
             if [[ -n "$ws" ]]; then
-                echo "$ws"
+                _RESOLVED_WS="$ws"
                 return 0
             fi
         fi
@@ -461,7 +547,7 @@ get_workspace_from_manifest() {
         fi
         
         if [[ -n "$ws" ]]; then
-            echo "$ws"
+            _RESOLVED_WS="$ws"
             return 0
         fi
     elif [[ "$file" == */.project_root ]]; then
@@ -470,17 +556,26 @@ get_workspace_from_manifest() {
         ws="${ws##[[:space:]]}"
         ws="${ws%%[[:space:]]}"
         if [[ -n "$ws" ]]; then
-            echo "$ws"
+            _RESOLVED_WS="$ws"
             return 0
         fi
     elif [[ "$file" == */.aider.input.history || "$file" == */.aider.history ]]; then
         local ws="${file%/*}"
         if [[ -n "$ws" ]]; then
-            echo "$ws"
+            _RESOLVED_WS="$ws"
             return 0
         fi
     fi
     return 1
+}
+
+get_workspace_from_manifest() {
+    if _resolve_workspace_from_manifest "$1"; then
+        echo "$_RESOLVED_WS"
+        return 0
+    else
+        return 1
+    fi
 }
 
 show_help() {
@@ -534,7 +629,7 @@ main() {
                 return 0
                 ;;
             -v|--version)
-                echo "agent-history 1.2.2"
+                echo "agent-history 1.2.3"
                 return 0
                 ;;
             -n)
@@ -670,27 +765,7 @@ main() {
             done
             
             matched_entries+=("$mtime|$matched_raw|$file_path")
-        done < <(find -L "${existing_paths[@]}" -type f \
-            ! -path "*/.tmp/*" \
-            ! -path "*/plugins/*" \
-            ! -path "*/cache/*" \
-            ! -path "*/backups/*" \
-            ! -path "*/downloads/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/.system_generated/*" \
-            ! -name "rollout-*.jsonl" \
-            \( \
-                -name "*.jsonl" \
-                -o -name ".project_root" \
-                -o -name "session-store.db" \
-                -o -name ".aider.input.history" \
-                -o -name ".aider.history" \
-                -o -name "*.db" \
-                -o -name "*.sqlite" \
-                -o -name "*.sqlite3" \
-                -o -path "*/conversations/*.pb" \
-                -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
-            \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 100 || true)
+        done < <(run_find_matching_files "${existing_paths[@]}" | sort -rn | head -n 100 || true)
     fi
 
     if (( ${#matched_entries[@]} == 0 )); then
@@ -713,7 +788,6 @@ main() {
     local valid_files=()
     local valid_agents=()
     local count=0
-    local -A seen_workspaces
     local has_more="false"
     local idx_line=0
 
@@ -728,8 +802,8 @@ main() {
         local mtime agent_path manifest_file
         IFS='|' read -r mtime agent_path manifest_file <<< "$line"
         
-        local ws
-        ws=$(get_workspace_from_manifest "$manifest_file" || true)
+        _resolve_workspace_from_manifest "$manifest_file" || true
+        local ws="$_RESOLVED_WS"
         if [[ -z "$ws" ]]; then
             continue
         fi
@@ -750,10 +824,11 @@ main() {
         fi
 
         # Deduplicate workspaces
-        if [[ -n "${seen_workspaces[$ws]:-}" ]]; then
+        local seen_var="_SEEN_${ws//[^a-zA-Z0-9_]/_}"
+        if [[ -n "${!seen_var:-}" ]]; then
             continue
         fi
-        seen_workspaces["$ws"]=1
+        printf -v "$seen_var" '1'
         
         valid_workspaces+=("$ws")
         valid_mtimes+=("$mtime")
@@ -790,13 +865,15 @@ main() {
     fi
 
     # Calculate padding dynamically based on terminal width and path lengths to prevent wrapping
-    local term_width
-    term_width=$(tput cols 2>/dev/null || echo 80)
+    local term_width="${COLUMNS:-}"
+    if [[ -z "$term_width" ]]; then
+        term_width=$(tput cols 2>/dev/null || echo 80)
+    fi
     local pad_width=0
     if (( term_width >= 80 )); then
         local max_len=0
         for ws in "${valid_workspaces[@]}"; do
-            local display_path="${ws/#$HOME/\~}"
+            local display_path="${ws/#$HOME/~}"
             if (( ${#display_path} > max_len )); then
                 max_len=${#display_path}
             fi
@@ -814,22 +891,22 @@ main() {
         local mtime="${valid_mtimes[i]}"
         local manifest_file="${valid_files[i]}"
         
-        local agent_name
-        agent_name=$(get_agent_name "$manifest_file")
+        _resolve_agent_name "$manifest_file"
+        local agent_name="$_RESOLVED_AGENT_NAME"
         
-        local rel_time
-        rel_time=$(format_relative_time "$mtime")
+        _resolve_relative_time "$mtime"
+        local rel_time="$_RESOLVED_REL_TIME"
         
         local time_str="${agent_name} · ${rel_time}"
         
-        local branch
-        branch=$(get_git_branch "$ws" || true)
+        _resolve_git_branch "$ws" || true
+        local branch="$_RESOLVED_GIT_BRANCH"
         local branch_str=""
         if [[ -n "$branch" ]]; then
             branch_str=" ${GREEN}(${branch})${RESET}"
         fi
         
-        local display_path="${ws/#$HOME/\~}"
+        local display_path="${ws/#$HOME/~}"
         
         # Calculate length of other display elements to check if path needs to be shrunk
         local other_len=5
