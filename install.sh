@@ -39,6 +39,11 @@ else
 fi
 
 # Clone or update the repository
+if [ -h "$PLUGIN_DIR" ]; then
+    echo -e "${YELLOW}Symlinked dev installation detected at $PLUGIN_DIR. Replacing with production repository...${NC}"
+    rm -f "$PLUGIN_DIR"
+fi
+
 if [ -d "$PLUGIN_DIR" ]; then
     echo -e "${YELLOW}Plugin directory already exists. Updating plugin via git pull...${NC}"
     git -C "$PLUGIN_DIR" pull
