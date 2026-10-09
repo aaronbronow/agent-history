@@ -1,5 +1,8 @@
 # agent-history plugin
 
+[![Awesome Zsh Plugins](https://img.shields.io/badge/awesome--zsh--plugins-listed-brightgreen.svg)](https://github.com/unixorn/awesome-zsh-plugins)
+[![GitHub Release](https://img.shields.io/github/v/release/aaronbronow/agent-history?color=blue)](https://github.com/aaronbronow/agent-history/releases/latest)
+
 The fastest shell shortcut to resume your recent AI coding sessions before your terminal cools down.
 
 It reads execution logs and session databases from AI coding assistants (such as Claude Code, GitHub Copilot, Aider, Gemini / Antigravity, Pi, Droid, Factory, Codex, OpenClaw, Hermes, and OpenCode), filters out deleted folders and home directory roots, and displays a beautiful status dashboard of your most recent sessions.
