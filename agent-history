@@ -230,14 +230,9 @@ run_find_matching_files() {
     fi
 
     if [[ "$_FIND_PRINTF_MODE" == "printf" ]]; then
-        find -L "$@" -type f \
-            ! -path "*/.tmp/*" \
-            ! -path "*/plugins/*" \
-            ! -path "*/cache/*" \
-            ! -path "*/backups/*" \
-            ! -path "*/downloads/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/.system_generated/*" \
+        find -L "$@" \
+            \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
+            -o -type f \
             ! -name "rollout-*.jsonl" \
             \( \
                 -name "*.jsonl" \
@@ -252,14 +247,9 @@ run_find_matching_files() {
                 -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
             \) -printf '%T@ %p\n' 2>/dev/null
     elif [[ "$_FIND_PRINTF_MODE" == "bsd_stat" ]]; then
-        find -L "$@" -type f \
-            ! -path "*/.tmp/*" \
-            ! -path "*/plugins/*" \
-            ! -path "*/cache/*" \
-            ! -path "*/backups/*" \
-            ! -path "*/downloads/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/.system_generated/*" \
+        find -L "$@" \
+            \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
+            -o -type f \
             ! -name "rollout-*.jsonl" \
             \( \
                 -name "*.jsonl" \
@@ -274,14 +264,9 @@ run_find_matching_files() {
                 -o \( -name "*.json" ! -name "settings.json" ! -name "mcp_config.json" ! -name "projects.json" ! -name "import_manifest.json" ! -name "*.metadata.json" \) \
             \) -exec stat -f '%m %N' {} + 2>/dev/null
     elif [[ "$_FIND_PRINTF_MODE" == "gnu_stat" ]]; then
-        find -L "$@" -type f \
-            ! -path "*/.tmp/*" \
-            ! -path "*/plugins/*" \
-            ! -path "*/cache/*" \
-            ! -path "*/backups/*" \
-            ! -path "*/downloads/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/.system_generated/*" \
+        find -L "$@" \
+            \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
+            -o -type f \
             ! -name "rollout-*.jsonl" \
             \( \
                 -name "*.jsonl" \
@@ -365,6 +350,13 @@ init_history_workspaces() {
 _resolve_workspace_from_manifest() {
     local file="$1"
     _RESOLVED_WS=""
+    if [[ "$file" == *"::"* ]]; then
+        local ws="${file#*::}"
+        if [[ -n "$ws" ]]; then
+            _RESOLVED_WS="$ws"
+            return 0
+        fi
+    fi
     if [[ ! -f "$file" ]]; then
         return 1
     fi
@@ -410,7 +402,10 @@ _resolve_workspace_from_manifest() {
         if [[ "$file" == *opencode.db ]]; then
             if [[ "$has_sqlite3" == "true" ]]; then
                 local ws
-                ws=$(sqlite3 "$file" "select directory from session order by time_updated desc limit 1" 2>/dev/null || true)
+                ws=$(sqlite3 "$file" "select directory from session where directory is not null and directory != '$HOME' and directory != '/' order by time_updated desc limit 1" 2>/dev/null || true)
+                if [[ -z "$ws" ]]; then
+                    ws=$(sqlite3 "$file" "select directory from session order by time_updated desc limit 1" 2>/dev/null || true)
+                fi
                 if [[ -n "$ws" ]]; then
                     _RESOLVED_WS="$ws"
                     return 0
@@ -739,21 +734,6 @@ main() {
             local mtime="${timestamp%%.*}"
             local file_path="${recent_res#* }"
             
-            # Override mtime for opencode.db with actual session time_updated to avoid global DB mtime skew
-            if [[ "$file_path" == *opencode.db ]]; then
-                if hash sqlite3 2>/dev/null; then
-                    local db_time
-                    db_time=$(sqlite3 "$file_path" "select time_updated from session order by time_updated desc limit 1" 2>/dev/null || true)
-                    if [[ -n "$db_time" ]]; then
-                        if (( ${#db_time} == 13 )); then
-                            mtime=$((db_time / 1000))
-                        else
-                            mtime="$db_time"
-                        fi
-                    fi
-                fi
-            fi
-            
             # Identify which raw path this file belongs to (for verbose/tracking)
             local matched_raw=""
             for raw_path in "${paths_checked[@]}"; do
@@ -763,6 +743,26 @@ main() {
                     break
                 fi
             done
+            
+            # Multi-session extraction for opencode.db
+            if [[ "$file_path" == *opencode.db ]]; then
+                if hash sqlite3 2>/dev/null; then
+                    local found_opencode=0
+                    while IFS='|' read -r db_dir db_time; do
+                        [[ -z "$db_dir" || -z "$db_time" ]] && continue
+                        [[ "$db_dir" == "$HOME" || "$db_dir" == "/" ]] && continue
+                        local session_mtime="$db_time"
+                        if (( ${#session_mtime} == 13 )); then
+                            session_mtime=$((session_mtime / 1000))
+                        fi
+                        matched_entries+=("$session_mtime|$matched_raw|$file_path::$db_dir")
+                        found_opencode=1
+                    done < <(sqlite3 "$file_path" "SELECT directory, max(time_updated) FROM session WHERE directory IS NOT NULL AND directory != '$HOME' AND directory != '/' GROUP BY directory ORDER BY max(time_updated) DESC LIMIT 10;" 2>/dev/null || true)
+                    if (( found_opencode == 1 )); then
+                        continue
+                    fi
+                fi
+            fi
             
             matched_entries+=("$mtime|$matched_raw|$file_path")
         done < <(run_find_matching_files "${existing_paths[@]}" | sort -rn | head -n 100 || true)

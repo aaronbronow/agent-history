@@ -251,8 +251,10 @@ test_get_workspace_from_manifest_opencode() {
     sqlite3 "$db_file" "CREATE TABLE session (directory TEXT, time_updated INTEGER);"
     sqlite3 "$db_file" "INSERT INTO session (directory, time_updated) VALUES ('/home/aaron/dev/project-a', 100);"
     sqlite3 "$db_file" "INSERT INTO session (directory, time_updated) VALUES ('/home/aaron/dev/project-b', 200);"
+    sqlite3 "$db_file" "INSERT INTO session (directory, time_updated) VALUES ('$HOME', 300);"
     
-    assert_equals "/home/aaron/dev/project-b" "$(get_workspace_from_manifest "$db_file")" "OpenCode SQLite db workspace extraction"
+    assert_equals "/home/aaron/dev/project-b" "$(get_workspace_from_manifest "$db_file")" "OpenCode SQLite db workspace extraction skips home directory"
+    assert_equals "/home/aaron/dev/project-direct" "$(get_workspace_from_manifest "$db_file::/home/aaron/dev/project-direct")" "OpenCode direct :: workspace extraction"
     
     # Test POSIX fallback for OpenCode
     # Override hash function to simulate missing sqlite3
