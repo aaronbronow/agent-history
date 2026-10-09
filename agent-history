@@ -593,6 +593,7 @@ Interactive Quick-Jump:
 Configuration:
   AGENT_HISTORY_LIMIT   Number of workspaces to display (default: 5, max: 25)
   AGENT_HISTORY_PATH    Colon-separated list of agent history paths to search
+  AGENT_HISTORY_DEV     Enable [dev] mode indicator in header (default: false)
 
 Contributors & Repository:
   https://github.com/aaronbronow/agent-history
@@ -604,6 +605,10 @@ main() {
     local path_idx=""
     local limit=5
     local max_limit=25
+    local dev_mode="false"
+    if [[ "${AGENT_HISTORY_DEV:-}" == "true" || "${AGENT_HISTORY_DEV:-}" == "1" ]]; then
+        dev_mode="true"
+    fi
     if [[ -n "${AGENT_HISTORY_LIMIT:-}" ]]; then
         if [[ "${AGENT_HISTORY_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
             limit="${AGENT_HISTORY_LIMIT}"
@@ -617,6 +622,10 @@ main() {
         case "$1" in
             --verbose)
                 verbose="true"
+                shift
+                ;;
+            --dev)
+                dev_mode="true"
                 shift
                 ;;
             -h|--help)
@@ -860,7 +869,7 @@ main() {
     local PURPLE="\033[35m"
 
     local dev_str=""
-    if [[ -h "$HOME/.oh-my-zsh/custom/plugins/agent-history" ]] || [[ "$(dirname "$(readlink -f "$0")")" == *"/dev/agent-history"* ]]; then
+    if [[ "$dev_mode" == "true" ]]; then
         dev_str=" ${GRAY}[dev]${RESET}"
     fi
 

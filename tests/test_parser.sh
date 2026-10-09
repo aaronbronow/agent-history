@@ -409,6 +409,43 @@ test_history_limit() {
     rm -rf "$temp_path"
 }
 
+test_dev_mode() {
+    echo "Running test_dev_mode..."
+    local script_bin="$SCRIPT_DIR/../agent-history"
+    
+    # By default, dev mode should NOT be active
+    local default_out
+    default_out=$("$script_bin")
+    if [[ "$default_out" == *"[dev]"* ]]; then
+        echo "FAIL: default execution should not include [dev]" >&2
+        exit 1
+    fi
+    
+    # With --dev flag, dev mode should be active
+    local dev_flag_out
+    dev_flag_out=$("$script_bin" --dev)
+    if [[ "$dev_flag_out" != *"[dev]"* ]]; then
+        echo "FAIL: --dev execution should include [dev]" >&2
+        exit 1
+    fi
+    
+    # With AGENT_HISTORY_DEV=true, dev mode should be active
+    local env_dev_out
+    env_dev_out=$(AGENT_HISTORY_DEV=true "$script_bin")
+    if [[ "$env_dev_out" != *"[dev]"* ]]; then
+        echo "FAIL: AGENT_HISTORY_DEV=true should include [dev]" >&2
+        exit 1
+    fi
+    
+    # With AGENT_HISTORY_DEV=false, dev mode should not be active
+    local env_nodev_out
+    env_nodev_out=$(AGENT_HISTORY_DEV=false "$script_bin")
+    if [[ "$env_nodev_out" == *"[dev]"* ]]; then
+        echo "FAIL: AGENT_HISTORY_DEV=false should not include [dev]" >&2
+        exit 1
+    fi
+}
+
 # Run all tests
 test_format_relative_time
 test_get_git_branch_standard
@@ -427,6 +464,7 @@ test_shrink_path
 test_version_flag
 test_help_flag
 test_history_limit
+test_dev_mode
 
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 
