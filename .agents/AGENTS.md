@@ -38,3 +38,14 @@ These rules and learnings should guide future updates and maintenance tasks in t
   2. `agent-history.plugin.zsh` (the version comment `# Version: X.Y.Z` at the top).
   3. `agent-history.plugin.sh` (the version comment `# Version: X.Y.Z` at the top).
   4. `tests/test_parser.sh` (the assertion checks inside `test_version_flag()`).
+- Ensure release versions never default to running in dev mode (`AGENT_HISTORY_DEV=0` / disabled by default).
+- For non-interactive git commit/tag sessions on `ubuntu-dev`, pass `--no-gpg-sign` to avoid 1Password Touch ID prompt timeouts.
+
+## 7. Repository Hygiene & README Minimalism
+- **Minimal Documentation**: Keep `README.md` clean, focused, and uncluttered. Do not add repository watch/star nudges or built-in auto-update prompts; OMZ plugin users should update via standard Oh My Zsh workflows (`omz pr update` or git pull).
+- **External Assets**: Do not commit binary social cards or preview assets directly into the repository git tree. Keep rendered preview cards in user space (e.g. `~/<repo>-social-card.png`) and upload them via GitHub repository settings.
+
+## 8. Social Preview Card Design & Feed Downscaling
+- **Feed Downscaling Physics**: Social platforms (like LinkedIn's `articleshare-shrink_480` and mobile feeds) frequently downscale 1280×640 images to 480×240px and display them on Retina/HiDPI screens.
+- **Typography Scale**: Never use dense, full-height terminal session dumps (7+ lines of ~12-14px font). Instead, design high-impact terminal cards with 2–3 punchy lines and large typography (20px+ at 1280×640) so character widths remain at least 8–10px in 480px thumbnails.
+- **Supersampling**: Render at 2x resolution (2560×1280) and downscale to exact 1280×640px via Lanczos filtering for clean sub-pixel anti-aliasing while keeping file sizes comfortably below GitHub's 1 MB limit (~300–400 KB).
