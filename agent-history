@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pure Bash replacement for antigravity-recent.py
-# Version: 1.2.3
+# Version: 1.2.4
 
 set -eu
 
@@ -234,6 +234,7 @@ run_find_matching_files() {
             \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
             -o -type f \
             ! -name "rollout-*.jsonl" \
+            ! -name "conversation_summaries*" \
             \( \
                 -name "*.jsonl" \
                 -o -name ".project_root" \
@@ -251,6 +252,7 @@ run_find_matching_files() {
             \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
             -o -type f \
             ! -name "rollout-*.jsonl" \
+            ! -name "conversation_summaries*" \
             \( \
                 -name "*.jsonl" \
                 -o -name ".project_root" \
@@ -268,6 +270,7 @@ run_find_matching_files() {
             \( -name ".system_generated" -o -name "node_modules" -o -name ".git" -o -name "cache" -o -name "plugins" -o -name ".tmp" -o -name "backups" -o -name "downloads" -o -name "scratch" \) -prune \
             -o -type f \
             ! -name "rollout-*.jsonl" \
+            ! -name "conversation_summaries*" \
             \( \
                 -name "*.jsonl" \
                 -o -name ".project_root" \
@@ -482,7 +485,7 @@ _resolve_workspace_from_manifest() {
             fi
             if [[ -n "$fallback_db" ]]; then
                 local base_db="${fallback_db##*/}"
-                if [[ "$base_db" != memories_* && "$base_db" != goals_* && "$base_db" != logs_* && "$base_db" != state_* ]]; then
+                if [[ "$base_db" != memories_* && "$base_db" != goals_* && "$base_db" != logs_* && "$base_db" != state_* && "$base_db" != conversation_summaries* ]]; then
                     # Strictly match using valid path characters [a-zA-Z0-9_./-]+ per workspace rules
                     ws=$(grep -o -a -E 'file:///[a-zA-Z0-9_./-]+' "$fallback_db" 2>/dev/null | head -n 1 | sed 's|^file://||' | sed -E 's/[^a-zA-Z0-9_./-]*$//' || true)
                     if [[ -z "$ws" ]]; then
@@ -633,7 +636,7 @@ main() {
                 return 0
                 ;;
             -v|--version)
-                echo "agent-history 1.2.3"
+                echo "agent-history 1.2.4"
                 return 0
                 ;;
             -n)
