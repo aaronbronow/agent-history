@@ -290,11 +290,11 @@ test_version_flag() {
     
     local version_out_short
     version_out_short=$("$script_bin" -v)
-    assert_equals "agent-history 1.2.3" "$version_out_short" "-v flag output"
+    assert_equals "agent-history 1.2.4" "$version_out_short" "-v flag output"
     
     local version_out_long
     version_out_long=$("$script_bin" --version)
-    assert_equals "agent-history 1.2.3" "$version_out_long" "--version flag output"
+    assert_equals "agent-history 1.2.4" "$version_out_long" "--version flag output"
 }
 
 test_help_flag() {
@@ -446,6 +446,31 @@ test_dev_mode() {
     fi
 }
 
+test_conversation_summaries_ignored() {
+    echo "Running test_conversation_summaries_ignored..."
+    local test_dir
+    test_dir=$(mktemp -d)
+    
+    local cs_db="$test_dir/conversation_summaries.db"
+    sqlite3 "$cs_db" "CREATE TABLE conversation_summaries (id TEXT, workspace_uris TEXT);"
+    sqlite3 "$cs_db" "INSERT INTO conversation_summaries (id, workspace_uris) VALUES ('main', 'file:///home/aaron/dev/packablock');"
+    
+    # 1. get_workspace_from_manifest should ignore conversation_summaries.db
+    local resolved
+    resolved=$(get_workspace_from_manifest "$cs_db" 2>/dev/null || true)
+    assert_equals "" "$resolved" "conversation_summaries.db should not be resolved as workspace"
+
+    # 2. run_find_matching_files should ignore conversation_summaries.db
+    local find_output
+    find_output=$(run_find_matching_files "$test_dir" 2>/dev/null || true)
+    if [[ "$find_output" == *"conversation_summaries.db"* ]]; then
+        echo "FAIL: run_find_matching_files should exclude conversation_summaries.db" >&2
+        exit 1
+    fi
+
+    rm -rf "$test_dir"
+}
+
 # Run all tests
 test_format_relative_time
 test_get_git_branch_standard
@@ -465,6 +490,7 @@ test_version_flag
 test_help_flag
 test_history_limit
 test_dev_mode
+test_conversation_summaries_ignored
 
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 
